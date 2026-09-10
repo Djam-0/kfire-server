@@ -44,6 +44,7 @@ export const en = {
 		invited: 'You were invited to join. Set your details below.',
 		displayName: 'Display name',
 		email: 'Email',
+		identifier: 'Username or email',
 		password: 'Password',
 		passwordHint: 'at least 12 characters; a passphrase works great',
 		strength: {

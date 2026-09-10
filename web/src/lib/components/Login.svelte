@@ -8,7 +8,8 @@
 
 	let mode = $state<'login' | 'register'>('login');
 	let displayName = $state('');
-	let email = $state('');
+	// Holds an email when registering, a username or an email when signing in.
+	let identifier = $state('');
 	let password = $state('');
 	let error = $state('');
 	let busy = $state(false);
@@ -51,9 +52,9 @@
 		busy = true;
 		try {
 			if (mode === 'register') {
-				await auth.register(displayName, email, password, inviteCode ?? undefined);
+				await auth.register(displayName, identifier, password, inviteCode ?? undefined);
 			} else {
-				await auth.login(email, password);
+				await auth.login(identifier, password);
 			}
 		} catch (err) {
 			error = err instanceof Error ? err.message : t('login.genericError');
@@ -104,16 +105,34 @@
 				</label>
 			{/if}
 
-			<label class="flex flex-col gap-1 text-xs text-[var(--color-muted)]">
-				{t('login.email')}
-				<input
-					type="email"
-					bind:value={email}
-					autocomplete={mode === 'register' ? 'email' : 'username'}
-					required
-					class="rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] px-3 py-2 text-sm text-[var(--color-text)] outline-none focus:border-[var(--color-brand)]"
-				/>
-			</label>
+			<!-- Signing in accepts a username or an email (the server matches on
+			     either), so the login field must not be type="email" or the browser
+			     rejects a plain username before we ever send it. Registration still
+			     needs a real address. Svelte forbids a dynamic `type` on a bound
+			     input, hence the two branches. -->
+			{#if mode === 'register'}
+				<label class="flex flex-col gap-1 text-xs text-[var(--color-muted)]">
+					{t('login.email')}
+					<input
+						type="email"
+						bind:value={identifier}
+						autocomplete="email"
+						required
+						class="rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] px-3 py-2 text-sm text-[var(--color-text)] outline-none focus:border-[var(--color-brand)]"
+					/>
+				</label>
+			{:else}
+				<label class="flex flex-col gap-1 text-xs text-[var(--color-muted)]">
+					{t('login.identifier')}
+					<input
+						type="text"
+						bind:value={identifier}
+						autocomplete="username"
+						required
+						class="rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] px-3 py-2 text-sm text-[var(--color-text)] outline-none focus:border-[var(--color-brand)]"
+					/>
+				</label>
+			{/if}
 
 			<label class="flex flex-col gap-1 text-xs text-[var(--color-muted)]">
 				{t('login.password')}

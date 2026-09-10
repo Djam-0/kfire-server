@@ -45,6 +45,7 @@ export const fr: Catalog = {
 		invited: 'Vous avez été invité à rejoindre. Renseignez vos informations ci-dessous.',
 		displayName: "Nom d'affichage",
 		email: 'E-mail',
+		identifier: 'Pseudo ou e-mail',
 		password: 'Mot de passe',
 		passwordHint: 'au moins 12 caractères ; une phrase de passe est idéale',
 		strength: {
