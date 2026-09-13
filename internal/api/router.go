@@ -19,10 +19,12 @@ import (
 	"github.com/knightsofeternity/kfire-server/internal/bnetsync"
 	"github.com/knightsofeternity/kfire-server/internal/config"
 	"github.com/knightsofeternity/kfire-server/internal/connectors/battlenet"
+	"github.com/knightsofeternity/kfire-server/internal/connectors/riot"
 	"github.com/knightsofeternity/kfire-server/internal/connectors/steam"
 	"github.com/knightsofeternity/kfire-server/internal/connectors/xbox"
 	"github.com/knightsofeternity/kfire-server/internal/crypto"
 	"github.com/knightsofeternity/kfire-server/internal/gameplugin"
+	"github.com/knightsofeternity/kfire-server/internal/riotsync"
 	"github.com/knightsofeternity/kfire-server/internal/steamsync"
 	"github.com/knightsofeternity/kfire-server/internal/store"
 	"github.com/knightsofeternity/kfire-server/internal/ws"
@@ -38,6 +40,8 @@ type handlers struct {
 	battlenet *battlenet.Connector
 	bnetSync  *bnetsync.Syncer
 	xbox      *xbox.Connector
+	riot      *riot.Connector
+	riotSync  *riotsync.Syncer
 	cipher    *crypto.Cipher
 	plugins   *gameplugin.Registry
 }
@@ -60,25 +64,41 @@ func rateLimiter(max int) fiber.Handler {
 }
 
 // Register mounts every route on the Fiber app.
-func Register(app *fiber.App, cfg *config.Config, st *store.Store, hub *ws.Hub, steamConn *steam.Connector, syncer *steamsync.Syncer, cipher *crypto.Cipher) {
+func Register(app *fiber.App, cfg *config.Config, st *store.Store, hub *ws.Hub, steamConn *steam.Connector, syncer *steamsync.Syncer, cipher *crypto.Cipher) *riotsync.Syncer {
 	bnConn := battlenet.New(cfg.BattlenetClientID, cfg.BattlenetClientSecret)
 	if cfg.BattlenetOAuthBase != "" {
 		bnConn.OAuthBase = cfg.BattlenetOAuthBase
 	}
 	bnConn.APIBase = cfg.BattlenetAPIBase
 	bnetSync := bnetsync.New(st, bnConn, cipher, cfg.BattlenetRegion)
+	riotConn := riot.New(cfg.RiotClientID, cfg.RiotClientSecret, cfg.RiotLolKey)
+	if cfg.RiotAuthBase != "" {
+		riotConn.AuthBase = cfg.RiotAuthBase
+	}
+	if cfg.RiotAPIBase != "" {
+		riotConn.APIHostTmpl = cfg.RiotAPIBase
+	}
+	riotSync := riotsync.New(st, riotConn, riot.NewDataDragon())
 	plugins := gameplugin.NewRegistry(st)
 	plugins.Register(bnetsync.NewWowPlugin(st, bnetSync, bnConn))
 	plugins.Register(bnetsync.NewBnetProfilePlugin(st, bnetSync, bnConn, "d3", "Diablo III", "diablo-iii"))
 	plugins.Register(bnetsync.NewBnetProfilePlugin(st, bnetSync, bnConn, "sc2", "StarCraft II", "starcraft-ii-battle-chest"))
+	lolPlugin := riotsync.NewLolPlugin(st, riotSync, riotConn)
+	plugins.Register(lolPlugin)
 	if err := plugins.Load(context.Background()); err != nil {
 		slog.Error("game plugins load", "err", err)
 	}
+	// The display surfaces are gated by the registry, but the live-game loop
+	// runs outside any request and would otherwise keep polling Riot for a
+	// plugin the admin has disabled.
+	riotSync.SetActiveCheck(func() bool {
+		return len(plugins.ForSlug(lolPlugin.Slugs()[0])) > 0
+	})
 	xblConn := xbox.New(cfg.XblAppKey)
 	if cfg.XblAPIBase != "" {
 		xblConn.APIBase = cfg.XblAPIBase
 	}
-	h := &handlers{cfg: cfg, store: st, hub: hub, steam: steamConn, steamSync: syncer, battlenet: bnConn, bnetSync: bnetSync, xbox: xblConn, cipher: cipher, plugins: plugins}
+	h := &handlers{cfg: cfg, store: st, hub: hub, steam: steamConn, steamSync: syncer, battlenet: bnConn, bnetSync: bnetSync, xbox: xblConn, riot: riotConn, riotSync: riotSync, cipher: cipher, plugins: plugins}
 
 	app.Get("/healthz", func(c *fiber.Ctx) error {
 		return c.JSON(fiber.Map{"status": "ok"})
@@ -137,6 +157,12 @@ func Register(app *fiber.App, cfg *config.Config, st *store.Store, hub *ws.Hub, 
 	v1.Get("/connect/xbox/callback", h.connectXboxCallback)
 	v1.Delete("/connect/xbox", h.requireAuth, h.disconnectXbox)
 
+	v1.Get("/connect/riot", h.requireAuth, h.connectRiotStart)
+	v1.Get("/connect/riot/callback", h.connectRiotCallback)
+	v1.Get("/connect/riot/region", h.requireAuth, h.riotRegion)
+	v1.Patch("/connect/riot/region", h.requireAuth, h.updateRiotRegion)
+	v1.Delete("/connect/riot", h.requireAuth, h.disconnectRiot)
+
 	admin := v1.Group("/admin", h.requireAuth, h.requireAdmin)
 	admin.Get("/games/catalog", h.gamesCatalogStatus)
 	admin.Post("/games/sync", h.syncGames)
@@ -184,6 +210,8 @@ func Register(app *fiber.App, cfg *config.Config, st *store.Store, hub *ws.Hub, 
 	app.Get("/img/games/:id/:kind", h.gameImage)
 	// Org logo (public: shown in the header and on the login screen).
 	app.Get("/img/org/logo", h.orgLogo)
+
+	return riotSync
 }
 
 func notImplemented(c *fiber.Ctx) error {

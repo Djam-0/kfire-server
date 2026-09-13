@@ -52,6 +52,61 @@ export type WowCharacter = {
 	achievement_points?: number;
 };
 
+export type LolRank = {
+	queue: string;
+	tier: string;
+	division: string;
+	lp: number;
+	wins: number;
+	losses: number;
+	hot_streak: boolean;
+};
+
+export type LolChampion = {
+	champion_id: number;
+	name: string;
+	icon_url?: string;
+	level: number;
+	points: number;
+};
+
+export type LolMatch = {
+	match_id: string;
+	win: boolean;
+	champion: string;
+	kills: number;
+	deaths: number;
+	assists: number;
+	queue_id: number;
+	duration_seconds: number;
+	played_at: string;
+};
+
+export type LolProfile = {
+	riot_id: string;
+	platform: string;
+	solo_score: number;
+	ranks: LolRank[];
+	top_champions: LolChampion[];
+	recent: LolMatch[];
+};
+
+export type LolLive = {
+	champion_id: number;
+	queue_id: number;
+	mode: string;
+	started_at: string;
+};
+
+export type LolPlayer = {
+	user_id: string;
+	username: string;
+	avatar_url?: string;
+	solo_score: number;
+	live?: LolLive;
+	data: LolProfile;
+};
+
 export type GameDetail = {
 	game: Game;
 	total_seconds: number;
@@ -63,6 +118,8 @@ export type GameDetail = {
 	wow_synced_at?: string;
 	bnet_profiles?: { user_id: string; username: string; data: Record<string, unknown> }[];
 	bnet_synced_at?: string;
+	lol_players?: LolPlayer[];
+	lol_synced_at?: string;
 };
 
 export type PlayerGameAchievement = {
@@ -98,6 +155,8 @@ export type PlayerGameDetail = {
 	last_played_at?: string;
 	wow_characters?: PlayerWowCharacter[];
 	bnet_profile?: Record<string, unknown>;
+	lol_profile?: LolProfile;
+	lol_live?: LolLive;
 	achievements?: PlayerGameAchievement[];
 };
 
@@ -406,6 +465,33 @@ export const api = {
 		if (!res.ok && res.status !== 404) throw new Error('failed to unlink');
 	},
 
+	/** Returns the Riot Sign On authorization URL to navigate to. */
+	async startRiotLink(): Promise<string> {
+		const data = await json<{ url: string }>(await authFetch('/api/v1/connect/riot'));
+		return data.url;
+	},
+
+	async unlinkRiot(): Promise<void> {
+		const res = await authFetch('/api/v1/connect/riot', { method: 'DELETE' });
+		if (!res.ok && res.status !== 404) throw new Error('failed to unlink');
+	},
+
+	/** Returns the member's detected League platform, or null when not linked. */
+	async getRiotRegion(): Promise<{ platform: string; source: string } | null> {
+		const res = await authFetch('/api/v1/connect/riot/region');
+		if (res.status === 404) return null;
+		return json(res);
+	},
+
+	/** Corrects the member's League platform when auto-detection got it wrong. */
+	async setRiotRegion(platform: string): Promise<void> {
+		const res = await authFetch('/api/v1/connect/riot/region', {
+			method: 'PATCH',
+			body: JSON.stringify({ platform })
+		});
+		if (!res.ok) throw new Error('failed to set region');
+	},
+
 	// --- admin ---------------------------------------------------------------
 
 	async getMembers(): Promise<Member[]> {
@@ -518,7 +604,7 @@ export async function getConfig(): Promise<{
 	needs_setup: boolean;
 	accent: string;
 	has_logo: boolean;
-	connectors: { steam: boolean; battlenet: boolean; xbox: boolean };
+	connectors: { steam: boolean; battlenet: boolean; xbox: boolean; riot: boolean };
 }> {
 	const res = await fetch('/api/v1/config');
 	return res.ok
@@ -531,7 +617,7 @@ export async function getConfig(): Promise<{
 				has_logo: false,
 				// Fail open: if config can't be loaded, still offer the connectors
 				// rather than hiding working ones on a transient error.
-				connectors: { steam: true, battlenet: true, xbox: true }
+				connectors: { steam: true, battlenet: true, xbox: true, riot: true }
 			};
 }
 
