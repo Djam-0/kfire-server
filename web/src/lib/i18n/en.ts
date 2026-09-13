@@ -242,8 +242,18 @@ export const en = {
 			title: 'Riot Games',
 			blurb: 'Link your Riot account to show your League of Legends rank, champions and recent games.',
 			region: 'League region',
-			link: 'Link Riot account',
-			unlink: 'Unlink'
+			errors: {
+				invalidRiotId: 'A Riot ID looks like Name#TAG.',
+				notFound: 'Riot does not know this Riot ID. Check the spelling and the tag.',
+				alreadyLinked: 'This Riot account is already linked to another member.',
+				disabled: 'The Riot connector is not configured on this instance.',
+				rateLimited: 'Too many attempts. Wait a minute and try again.'
+			},
+			riotIdLabel: 'Riot ID',
+			riotIdPlaceholder: 'Name#EUW',
+			submit: 'Link account',
+			unlink: 'Unlink',
+			trust: 'KFIRE does not verify that you own this account, it only checks that the Riot ID exists and is not already linked to another member.'
 		},
 		bnetReconnectStats: 'Reconnect Battle.net to enable your game stats'
 	},
