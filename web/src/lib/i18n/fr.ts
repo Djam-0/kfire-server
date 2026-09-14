@@ -145,7 +145,21 @@ export const fr: Catalog = {
 		wowShowMore: 'Voir {count} de plus',
 		wowShowLess: 'Voir moins',
 		wowItemLevel: 'iLvl',
-		wowMythic: 'M+'
+		wowMythic: 'M+',
+		hsHeroMatches: '{n} parties',
+		hsHeroMatch: '1 partie',
+		hsHeroes: 'Héros les plus joués',
+		hsHeroMembers: '{n} membres',
+		hsHeroMember: '1 membre',
+		hsRecord: 'Bilan Hearthstone',
+		hsMatches: 'Parties',
+		hsPlayers: 'Membres qui remontent',
+		hsWinRate: 'Victoires',
+		hsAvgPlacement: 'Position moyenne',
+		hsTop4: 'Top 4',
+		hsNoPlacement: 'Aucune partie de Bataille de Champions',
+		hsRatingNote:
+			"La cote de Bataille de Champions n'est pas inscrite dans les journaux du jeu, KFIRE mesure donc le niveau par la position moyenne et le taux de top 4."
 	},
 	playerGame: {
 		loading: 'Chargement...',

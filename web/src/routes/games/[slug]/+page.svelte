@@ -12,6 +12,14 @@
 	} from '$lib/wow';
 	import { inGame, mostPlayedChampion, podium, soloRank, tierSpread, winRate,
 	         crestURL, loadingArtURL, mainChampion, tierColour } from '$lib/lol';
+	import {
+		hsWinRate,
+		hsTop4Rate,
+		hsByPlacement,
+		hsTotalMatches,
+		heroName,
+		heroArt
+	} from '$lib/hearthstone';
 
 	let detail = $state<GameDetail | null>(null);
 	let loading = $state(true);
@@ -56,6 +64,12 @@
 	const lolWeekSeconds = $derived(
 		(detail?.recent_players ?? []).reduce((n, p) => n + p.total_seconds, 0)
 	);
+
+	const hsPlayers = $derived(detail?.hs_players ?? []);
+	const hsRanked = $derived(hsByPlacement(hsPlayers));
+	// Already ordered by the server, most played first. Six fills two rows on a
+	// phone and one on a desktop, which is enough to read a habit.
+	const hsHeroes = $derived((detail?.hs_heroes ?? []).slice(0, 6));
 
 	const wowChars = $derived(detail?.wow_characters ?? []);
 	const wowRosterList = $derived(wowRosters(wowChars));
@@ -381,6 +395,106 @@
 					</div>
 				{/each}
 			</div>
+		</section>
+	{/if}
+
+	{#if hsPlayers.length}
+		<section class="mt-6">
+			<h2 class="pd-heading mb-3 flex items-center gap-2 text-sm text-[var(--color-brand-bright)]">
+				<span class="inline-block h-4 w-1 bg-[var(--color-brand)]"></span>
+				{t('game.hsRecord')}
+			</h2>
+
+			<div class="mb-3 grid grid-cols-2 gap-3">
+				<div class="pd-card p-3">
+					<p class="text-xs uppercase tracking-wide text-[var(--color-muted)]">{t('game.hsPlayers')}</p>
+					<p class="font-display text-2xl font-bold text-[var(--color-text)]">{hsPlayers.length}</p>
+				</div>
+				<div class="pd-card p-3">
+					<p class="text-xs uppercase tracking-wide text-[var(--color-muted)]">{t('game.hsMatches')}</p>
+					<p class="font-display text-2xl font-bold text-[var(--color-cyan)]">{hsTotalMatches(hsPlayers)}</p>
+				</div>
+			</div>
+
+			<div class="pd-card overflow-x-auto">
+				<table class="w-full min-w-[560px] border-collapse">
+					<thead>
+						<tr class="border-b border-[var(--color-border)]">
+							<th class="px-3 py-2 text-left font-display text-xs uppercase tracking-wide text-[var(--color-muted)]">{t('lol.member')}</th>
+							<th class="px-3 py-2 text-left font-display text-xs uppercase tracking-wide text-[var(--color-muted)]">{t('game.hsAvgPlacement')}</th>
+							<th class="px-3 py-2 text-left font-display text-xs uppercase tracking-wide text-[var(--color-muted)]">{t('game.hsTop4')}</th>
+							<th class="px-3 py-2 text-left font-display text-xs uppercase tracking-wide text-[var(--color-muted)]">{t('game.hsWinRate')}</th>
+							<th class="px-3 py-2 text-left font-display text-xs uppercase tracking-wide text-[var(--color-muted)]">{t('game.hsMatches')}</th>
+						</tr>
+					</thead>
+					<tbody>
+						{#each hsRanked as p (p.user_id)}
+							<tr class="border-b border-[var(--color-border)]/50 last:border-b-0 hover:bg-[var(--color-surface-2)]">
+								<td class="px-3 py-2">
+									<a href="/players/{p.user_id}" class="flex items-center gap-2 hover:underline">
+										<Avatar username={p.username} url={p.avatar_url} size={28} />
+										<span class="truncate font-display font-semibold text-[var(--color-text)]">{p.username}</span>
+									</a>
+								</td>
+								<td class="px-3 py-2 whitespace-nowrap">
+									{#if p.avg_placement !== undefined}
+										<span class="font-display text-sm text-[var(--color-brand-bright)]">
+											{p.avg_placement.toFixed(1)}
+										</span>
+									{:else}
+										<span class="text-xs italic text-[var(--color-muted)]">{t('game.hsNoPlacement')}</span>
+									{/if}
+								</td>
+								<td class="px-3 py-2 whitespace-nowrap text-sm tabular-nums">
+									{#if p.ranked > 0}{hsTop4Rate(p)}%{/if}
+								</td>
+								<td class="px-3 py-2 whitespace-nowrap text-sm tabular-nums">{hsWinRate(p)}%</td>
+								<td class="px-3 py-2 whitespace-nowrap text-sm tabular-nums text-[var(--color-muted)]">{p.matches}</td>
+							</tr>
+						{/each}
+					</tbody>
+				</table>
+			</div>
+
+			{#if hsHeroes.length}
+				<h3 class="mt-5 mb-2 font-display text-xs uppercase tracking-wide text-[var(--color-muted)]">
+					{t('game.hsHeroes')}
+				</h3>
+				<div class="grid grid-cols-2 gap-3 sm:grid-cols-3">
+					{#each hsHeroes as h (h.hero_card_id)}
+						<div class="pd-card flex items-center gap-3 p-2">
+							<img
+								src={heroArt(h.hero_card_id)}
+								alt=""
+								loading="lazy"
+								class="h-12 w-12 shrink-0 rounded-full object-cover"
+							/>
+							<div class="min-w-0">
+								<p class="truncate font-display text-sm font-semibold text-[var(--color-text)]">
+									{heroName(h.hero_card_id)}
+								</p>
+								<p class="text-xs text-[var(--color-muted)]">
+									{h.matches > 1 ? t('game.hsHeroMatches', { n: h.matches }) : t('game.hsHeroMatch')}
+									&middot;
+									{h.players > 1
+										? t('game.hsHeroMembers', { n: h.players })
+										: t('game.hsHeroMember')}
+								</p>
+								<p class="text-xs tabular-nums">
+									<span class="text-[var(--color-brand-bright)]"
+										>{h.avg_placement.toFixed(1)}</span
+									>
+									<span class="text-[var(--color-muted)]"
+										>&middot; {Math.round((h.top4 * 100) / h.matches)}% {t('game.hsTop4')}</span
+									>
+								</p>
+							</div>
+						</div>
+					{/each}
+				</div>
+			{/if}
+
+			<p class="mt-2 text-xs text-[var(--color-muted)]/80">{t('game.hsRatingNote')}</p>
 		</section>
 	{/if}
 

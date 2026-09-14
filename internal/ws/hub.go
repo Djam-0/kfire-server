@@ -7,6 +7,7 @@ import (
 	"context"
 	"encoding/json"
 	"log/slog"
+	"regexp"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -51,6 +52,64 @@ type helloPayload struct {
 
 type gameEventPayload struct {
 	GameSlug string `json:"game_slug"`
+}
+
+// matchResultPayload is one finished match, already summarised by the desktop
+// client. The client reads the game's log files and sends only this: never the
+// opponent's name, never a card.
+//
+// Turns and Placement are pointers because a match is worth recording even when
+// a secondary field was unreadable.
+// clockSkewTolerance is how far ahead of the server a client's clock may be
+// before its match results are rejected.
+const clockSkewTolerance = 5 * time.Minute
+
+type matchResultPayload struct {
+	GameSlug  string `json:"game_slug"`
+	Mode      string `json:"mode"`
+	Result    string `json:"result"`
+	Turns     *int   `json:"turns"`
+	Placement *int   `json:"placement"`
+	// HeroCardID is the Battlegrounds hero, as the card identifier the game
+	// writes in its own log. Never the hero's name: the log is localised, so
+	// two members playing the same hero would report two different strings.
+	HeroCardID *string   `json:"hero_card_id"`
+	PlayedAt   time.Time `json:"played_at"`
+}
+
+// heroCardID is the shape of a card identifier. Refusing anything else keeps
+// the column incapable of carrying a name, which is the whole point.
+var heroCardID = regexp.MustCompile(`^[A-Za-z0-9_]{1,64}$`)
+
+// valid reports whether the payload is worth persisting. The database enforces
+// the same rules, but rejecting here gives the client a clear error instead of
+// an opaque write failure.
+func (p matchResultPayload) valid() bool {
+	if p.GameSlug == "" || p.PlayedAt.IsZero() {
+		return false
+	}
+	if p.Mode != "battlegrounds" && p.Mode != "constructed" {
+		return false
+	}
+	if p.Result != "win" && p.Result != "loss" && p.Result != "draw" {
+		return false
+	}
+	if p.Placement != nil && (*p.Placement < 1 || *p.Placement > 8) {
+		return false
+	}
+	if p.Turns != nil && *p.Turns < 0 {
+		return false
+	}
+	if p.HeroCardID != nil && !heroCardID.MatchString(*p.HeroCardID) {
+		return false
+	}
+	// A queued match can be old, never future. The tolerance absorbs a
+	// desktop clock that drifts a little without letting a badly set one
+	// poison the last-played date of the whole roster.
+	if p.PlayedAt.After(time.Now().Add(clockSkewTolerance)) {
+		return false
+	}
+	return true
 }
 
 // client is one WebSocket connection.
@@ -308,6 +367,8 @@ func (c *client) readLoop(h *Hub) {
 			c.handleGameEvent(h, env, false)
 		case "heartbeat":
 			// Deadline already refreshed above.
+		case "match_result":
+			c.handleMatchResult(h, env)
 		default:
 			// Unknown types are ignored for forward compatibility.
 		}
@@ -408,6 +469,41 @@ func (c *client) handleGameEvent(h *Hub, env Envelope, started bool) {
 			"slug", game.Slug, "started", started)
 		h.BroadcastPresence(ctx, c.presenceUser())
 	}
+}
+
+// handleMatchResult records one finished match reported by the client.
+//
+// Unlike a game event, this changes no presence and broadcasts nothing: a match
+// is history, not a state.
+func (c *client) handleMatchResult(h *Hub, env Envelope) {
+	var p matchResultPayload
+	if err := json.Unmarshal(env.Payload, &p); err != nil || !p.valid() {
+		c.sendError("invalid_match", "malformed match result payload", false)
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), dbTimeout)
+	defer cancel()
+
+	game, err := h.store.GetGameBySlug(ctx, p.GameSlug)
+	if err != nil {
+		c.sendError("unknown_game", "game slug not in the catalog: "+p.GameSlug, false)
+		return
+	}
+
+	if err := h.store.InsertHearthstoneMatch(ctx, store.HearthstoneMatch{
+		UserID: c.userID, GameID: game.ID, Mode: p.Mode, Result: p.Result,
+		Turns: p.Turns, Placement: p.Placement, HeroCardID: p.HeroCardID,
+		PlayedAt: p.PlayedAt,
+	}); err != nil {
+		slog.Error("ws: persist match result", "user_id", c.userID, "err", err)
+		// Tell the client, otherwise it drops the match from its queue
+		// believing it landed.
+		c.sendError("match_not_recorded", "could not record match result", false)
+		return
+	}
+	slog.Info("ws: match result", "user_id", c.userID, "slug", game.Slug,
+		"mode", p.Mode, "result", p.Result)
 }
 
 // sendEnvelope queues a typed message for this client.
