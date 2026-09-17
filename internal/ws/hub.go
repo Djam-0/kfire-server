@@ -6,8 +6,8 @@ package ws
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"log/slog"
-	"regexp"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -15,6 +15,7 @@ import (
 	"github.com/gofiber/contrib/websocket"
 
 	"github.com/knightsofeternity/kfire-server/internal/auth"
+	"github.com/knightsofeternity/kfire-server/internal/matchrecord"
 	"github.com/knightsofeternity/kfire-server/internal/store"
 )
 
@@ -54,62 +55,16 @@ type gameEventPayload struct {
 	GameSlug string `json:"game_slug"`
 }
 
-// matchResultPayload is one finished match, already summarised by the desktop
-// client. The client reads the game's log files and sends only this: never the
-// opponent's name, never a card.
+// matchEnvelope is everything the hub needs to understand about a match
+// result: which game, and the rest as-is. The shape of the rest belongs to
+// the game, not to the control plane.
 //
-// Turns and Placement are pointers because a match is worth recording even when
-// a secondary field was unreadable.
-// clockSkewTolerance is how far ahead of the server a client's clock may be
-// before its match results are rejected.
-const clockSkewTolerance = 5 * time.Minute
-
-type matchResultPayload struct {
-	GameSlug  string `json:"game_slug"`
-	Mode      string `json:"mode"`
-	Result    string `json:"result"`
-	Turns     *int   `json:"turns"`
-	Placement *int   `json:"placement"`
-	// HeroCardID is the Battlegrounds hero, as the card identifier the game
-	// writes in its own log. Never the hero's name: the log is localised, so
-	// two members playing the same hero would report two different strings.
-	HeroCardID *string   `json:"hero_card_id"`
-	PlayedAt   time.Time `json:"played_at"`
-}
-
-// heroCardID is the shape of a card identifier. Refusing anything else keeps
-// the column incapable of carrying a name, which is the whole point.
-var heroCardID = regexp.MustCompile(`^[A-Za-z0-9_]{1,64}$`)
-
-// valid reports whether the payload is worth persisting. The database enforces
-// the same rules, but rejecting here gives the client a clear error instead of
-// an opaque write failure.
-func (p matchResultPayload) valid() bool {
-	if p.GameSlug == "" || p.PlayedAt.IsZero() {
-		return false
-	}
-	if p.Mode != "battlegrounds" && p.Mode != "constructed" {
-		return false
-	}
-	if p.Result != "win" && p.Result != "loss" && p.Result != "draw" {
-		return false
-	}
-	if p.Placement != nil && (*p.Placement < 1 || *p.Placement > 8) {
-		return false
-	}
-	if p.Turns != nil && *p.Turns < 0 {
-		return false
-	}
-	if p.HeroCardID != nil && !heroCardID.MatchString(*p.HeroCardID) {
-		return false
-	}
-	// A queued match can be old, never future. The tolerance absorbs a
-	// desktop clock that drifts a little without letting a badly set one
-	// poison the last-played date of the whole roster.
-	if p.PlayedAt.After(time.Now().Add(clockSkewTolerance)) {
-		return false
-	}
-	return true
+// Identical to gameEventPayload today, and yet distinct on purpose: a game
+// event is a presence state the hub interprets in full, while this is only
+// the label of a body the hub will never read. Merging them would suggest
+// they evolve together.
+type matchEnvelope struct {
+	GameSlug string `json:"game_slug"`
 }
 
 // client is one WebSocket connection.
@@ -166,21 +121,38 @@ type Hub struct {
 	jwtSecret []byte
 	store     *store.Store
 	publicURL string
+	recorders *matchrecord.Registry
 	mu        sync.RWMutex
 	clients   map[*client]struct{}
 	online    map[string]*onlineState // by user ID
+	live      map[string]liveEntry    // in-progress match state, by member ID
+	// liveVisible says, per member, whether their live match may be
+	// broadcast.
+	//
+	// This state lives in the hub, under h.mu, and NOT on the connection,
+	// unlike the equivalent fields read at hello time. That is deliberate:
+	// the invisibility toggle arrives over an HTTP request, so from a
+	// different goroutine than the connection's read loop. Writing the
+	// connection's fields there would be a race, caught by the race
+	// detector. Here, the lock already protecting the rest of the shared
+	// state takes care of it.
+	liveVisible map[string]bool
 }
 
 // NewHub creates an empty hub. jwtSecret verifies the access tokens presented
 // in `hello` handshakes; st persists sessions and resolves games; publicURL
-// builds image-proxy URLs in presence broadcasts.
-func NewHub(jwtSecret []byte, st *store.Store, publicURL string) *Hub {
+// builds image-proxy URLs in presence broadcasts; recorders routes a match
+// result to the game that knows how to read it.
+func NewHub(jwtSecret []byte, st *store.Store, publicURL string, recorders *matchrecord.Registry) *Hub {
 	return &Hub{
-		jwtSecret: jwtSecret,
-		store:     st,
-		publicURL: publicURL,
-		clients:   make(map[*client]struct{}),
-		online:    make(map[string]*onlineState),
+		jwtSecret:   jwtSecret,
+		store:       st,
+		publicURL:   publicURL,
+		recorders:   recorders,
+		clients:     make(map[*client]struct{}),
+		online:      make(map[string]*onlineState),
+		live:        make(map[string]liveEntry),
+		liveVisible: make(map[string]bool),
 	}
 }
 
@@ -243,6 +215,7 @@ func (h *Hub) register(c *client) {
 }
 
 func (h *Hub) unregister(c *client) {
+	hadLive := false
 	h.mu.Lock()
 	delete(h.clients, c)
 	wasLastConn := false
@@ -252,6 +225,9 @@ func (h *Hub) unregister(c *client) {
 			if st.conns <= 0 {
 				delete(h.online, c.userID)
 				wasLastConn = true
+				hadLive = h.live[c.userID].payload.GameSlug != ""
+				delete(h.live, c.userID)
+				delete(h.liveVisible, c.userID)
 			}
 		}
 	}
@@ -273,6 +249,13 @@ func (h *Hub) unregister(c *client) {
 			slog.Info("ws: closed open sessions on disconnect", "user_id", c.userID, "count", n)
 		}
 		h.BroadcastPresence(ctx, c.presenceUser())
+	}
+
+	// The last connection dropping takes the in-progress match with it:
+	// without this, a member who closes their client mid-match would stay
+	// displayed as "in match" until the server restarts.
+	if hadLive {
+		h.Broadcast("live_match", map[string]any{"user_id": c.userID, "match": nil})
 	}
 }
 
@@ -369,6 +352,8 @@ func (c *client) readLoop(h *Hub) {
 			// Deadline already refreshed above.
 		case "match_result":
 			c.handleMatchResult(h, env)
+		case "live_match":
+			c.handleLiveMatch(h, env)
 		default:
 			// Unknown types are ignored for forward compatibility.
 		}
@@ -413,6 +398,7 @@ func (c *client) handleHello(h *Hub, env Envelope) {
 	c.avatarURL = u.AvatarURL
 	c.activityVisible = u.ActivityVisible
 	c.presenceStatus = u.PresenceStatus
+	h.setLiveVisible(u.ID, u.ActivityVisible, u.PresenceStatus)
 	c.authenticated.Store(true)
 	firstConn := h.connect(c)
 	_ = c.conn.SetReadDeadline(time.Now().Add(livenessTimeout))
@@ -473,11 +459,16 @@ func (c *client) handleGameEvent(h *Hub, env Envelope, started bool) {
 
 // handleMatchResult records one finished match reported by the client.
 //
-// Unlike a game event, this changes no presence and broadcasts nothing: a match
-// is history, not a state.
+// Unlike a game event, this changes no presence and broadcasts nothing: a
+// match is history, not a state.
 func (c *client) handleMatchResult(h *Hub, env Envelope) {
-	var p matchResultPayload
-	if err := json.Unmarshal(env.Payload, &p); err != nil || !p.valid() {
+	// The payload is decoded TWICE, here for the slug alone and then in the
+	// recorder for the game's fields. This is intentional: passing along a
+	// partial decode would give the hub back the knowledge of the game it
+	// was just relieved of, to save a few microseconds on one message per
+	// match.
+	var e matchEnvelope
+	if err := json.Unmarshal(env.Payload, &e); err != nil || e.GameSlug == "" {
 		c.sendError("invalid_match", "malformed match result payload", false)
 		return
 	}
@@ -485,25 +476,176 @@ func (c *client) handleMatchResult(h *Hub, env Envelope) {
 	ctx, cancel := context.WithTimeout(context.Background(), dbTimeout)
 	defer cancel()
 
-	game, err := h.store.GetGameBySlug(ctx, p.GameSlug)
+	game, err := h.store.GetGameBySlug(ctx, e.GameSlug)
 	if err != nil {
-		c.sendError("unknown_game", "game slug not in the catalog: "+p.GameSlug, false)
+		c.sendError("unknown_game", "game slug not in the catalog: "+e.GameSlug, false)
 		return
 	}
 
-	if err := h.store.InsertHearthstoneMatch(ctx, store.HearthstoneMatch{
-		UserID: c.userID, GameID: game.ID, Mode: p.Mode, Result: p.Result,
-		Turns: p.Turns, Placement: p.Placement, HeroCardID: p.HeroCardID,
-		PlayedAt: p.PlayedAt,
-	}); err != nil {
-		slog.Error("ws: persist match result", "user_id", c.userID, "err", err)
+	err = h.recorders.Record(ctx, e.GameSlug, c.userID, game.ID, env.Payload)
+	switch {
+	case err == nil:
+		slog.Info("ws: match result", "user_id", c.userID, "slug", game.Slug)
+	case errors.Is(err, matchrecord.ErrUnknownGame):
+		// The game is in the catalog but no recorder tracks it: this is a
+		// client ahead of this server, not a write error.
+		c.sendError("unknown_game", "this server does not track matches for "+e.GameSlug, false)
+	case errors.Is(err, matchrecord.ErrInvalidPayload):
+		// The client only gets a generic code; it has no use for our
+		// internal rules. The log, though, carries the exact reason:
+		// without it, a client whose serialization is broken and
+		// legitimate data that hit a rule written too early look alike,
+		// and neither is diagnosable.
+		slog.Warn("ws: match result rejected", "user_id", c.userID, "slug", game.Slug, "err", err)
+		c.sendError("invalid_match", "malformed match result payload", false)
+	default:
+		slog.Error("ws: persist match result", "user_id", c.userID, "slug", game.Slug, "err", err)
 		// Tell the client, otherwise it drops the match from its queue
 		// believing it landed.
 		c.sendError("match_not_recorded", "could not record match result", false)
+	}
+}
+
+// handleLiveMatch rebroadcasts the current state of a match.
+//
+// Nothing is written: this state lives in memory for the duration of the
+// match and then disappears. It is the exact counterpart of presence, which
+// is broadcast and never archived.
+func (c *client) handleLiveMatch(h *Hub, env Envelope) {
+	var p livePayload
+	if err := json.Unmarshal(env.Payload, &p); err != nil || !p.valid() {
+		c.sendError("invalid_live_match", "malformed live match state", false)
 		return
 	}
-	slog.Info("ws: match result", "user_id", c.userID, "slug", game.Slug,
-		"mode", p.Mode, "result", p.Result)
+
+	// An invisible or chosen-offline member does not broadcast their match.
+	// The decision is read from the hub and not from the connection,
+	// because it can change through the API while the connection lives on.
+	if !h.liveAllowed(c.userID) {
+		return
+	}
+
+	h.setLive(c.userID, p)
+	h.Broadcast("live_match", h.liveJSON(c.userID))
+}
+
+// setLive stores or clears a member's match state.
+func (h *Hub) setLive(userID string, p livePayload) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	if p.Ended {
+		delete(h.live, userID)
+		return
+	}
+	h.live[userID] = liveEntry{payload: p, updatedAt: time.Now()}
+}
+
+// setLiveVisible stores what a member allows for their live match.
+func (h *Hub) setLiveVisible(userID string, activityVisible bool, presenceStatus string) bool {
+	allowed := activityVisible &&
+		store.ApplyPresenceOverride(presenceStatus, "in_game") == "in_game"
+	h.mu.Lock()
+	h.liveVisible[userID] = allowed
+	h.mu.Unlock()
+	return allowed
+}
+
+// liveAllowed reports whether this member's live match may be broadcast.
+func (h *Hub) liveAllowed(userID string) bool {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+	return h.liveVisible[userID]
+}
+
+// SetVisibility takes note of a visibility change arriving through the API,
+// and immediately cuts the live match if the member just went hidden.
+//
+// Without this, a member who goes invisible mid-match would keep being
+// broadcast to the whole guild, twice a second, until their next reconnect.
+// Someone who asks not to be seen anymore must stop being seen right away.
+func (h *Hub) SetVisibility(userID string, activityVisible bool, presenceStatus string) {
+	if h.setLiveVisible(userID, activityVisible, presenceStatus) {
+		return
+	}
+	h.mu.Lock()
+	_, hadMatch := h.live[userID]
+	delete(h.live, userID)
+	h.mu.Unlock()
+
+	// Outside the lock: Broadcast takes h.mu for reading, and an RWMutex is
+	// not reentrant.
+	if hadMatch {
+		h.Broadcast("live_match", map[string]any{"user_id": userID, "match": nil})
+	}
+}
+
+// LiveMatch returns a member's current match state, or nil if there is none
+// or it expired. Exported so the REST API can serve the state to a page
+// opened mid-match, which missed the earlier broadcasts.
+func (h *Hub) LiveMatch(userID string) map[string]any {
+	h.mu.RLock()
+	e, ok := h.live[userID]
+	h.mu.RUnlock()
+	if !ok || e.expired(time.Now()) {
+		return nil
+	}
+	return liveEntryJSON(e.payload)
+}
+
+// liveJSON builds the payload broadcast for a member: the state, or nil
+// when the match is over.
+func (h *Hub) liveJSON(userID string) map[string]any {
+	return map[string]any{"user_id": userID, "match": h.LiveMatch(userID)}
+}
+
+// SweepLive clears match states that no sample has refreshed since liveTTL,
+// and announces their end.
+//
+// Without this sweep, a member whose game crashes while KFIRE stays
+// connected would leave a frozen score on the whole guild's screen forever:
+// the socket does not close, so unregister never runs. LiveMatch's lazy
+// expiry is not enough, since it warns no one.
+func (h *Hub) SweepLive(ctx context.Context) {
+	t := time.NewTicker(liveTTL / 3)
+	defer t.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case now := <-t.C:
+			h.mu.Lock()
+			var ended []string
+			for id, e := range h.live {
+				if e.expired(now) {
+					ended = append(ended, id)
+					delete(h.live, id)
+				}
+			}
+			h.mu.Unlock()
+			// Outside the lock: Broadcast takes h.mu for reading, and an
+			// RWMutex is not reentrant.
+			for _, id := range ended {
+				h.Broadcast("live_match", map[string]any{"user_id": id, "match": nil})
+			}
+		}
+	}
+}
+
+// liveEntryJSON is the shape sent to the browser.
+func liveEntryJSON(p livePayload) map[string]any {
+	return map[string]any{
+		"game_slug":         p.GameSlug,
+		"team_blue_score":   p.TeamBlueScore,
+		"team_orange_score": p.TeamOrangeScore,
+		"seconds_remaining": p.SecondsRemaining,
+		"overtime":          p.Overtime,
+		"goals":             p.Goals,
+		"assists":           p.Assists,
+		"saves":             p.Saves,
+		"shots":             p.Shots,
+		"score":             p.Score,
+		"demos":             p.Demos,
+	}
 }
 
 // sendEnvelope queues a typed message for this client.

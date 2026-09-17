@@ -20,6 +20,9 @@ import (
 	"github.com/knightsofeternity/kfire-server/internal/connectors/xbox"
 	"github.com/knightsofeternity/kfire-server/internal/crypto"
 	"github.com/knightsofeternity/kfire-server/internal/games"
+	"github.com/knightsofeternity/kfire-server/internal/hearthstone"
+	"github.com/knightsofeternity/kfire-server/internal/matchrecord"
+	"github.com/knightsofeternity/kfire-server/internal/rocketleague"
 	"github.com/knightsofeternity/kfire-server/internal/steamsync"
 	"github.com/knightsofeternity/kfire-server/internal/store"
 	"github.com/knightsofeternity/kfire-server/internal/ws"
@@ -78,7 +81,13 @@ func main() {
 		return c.Next()
 	})
 
-	hub := ws.NewHub([]byte(cfg.JWTSecret), st, cfg.PublicURL)
+	// Match recorders are built here, before the hub, because the hub
+	// reads them and never mutates them.
+	recorders := matchrecord.NewRegistry(
+		hearthstone.NewRecorder(st),
+		rocketleague.NewRecorder(st),
+	)
+	hub := ws.NewHub([]byte(cfg.JWTSecret), st, cfg.PublicURL, recorders)
 
 	// Shared context for all background pollers.
 	pollCtx, cancelPoll := context.WithCancel(context.Background())
@@ -87,6 +96,10 @@ func main() {
 	// Games catalog: seeded on first boot, then kept in step with Discord's
 	// list. Runs in the background so startup stays fast when upstream is slow.
 	go refreshCatalog(pollCtx, st)
+
+	// Sweeps away live match states that no sample has refreshed since
+	// liveTTL, for the member whose game crashed without closing the socket.
+	go hub.SweepLive(pollCtx)
 
 	// Steam connector + background library/achievement poller.
 	steamConn := steam.New(cfg.SteamAPIKey)
