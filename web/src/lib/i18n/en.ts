@@ -178,7 +178,30 @@ export const en = {
 		hsModeConstructed: 'Constructed',
 		hsModeArena: 'Arena',
 		hsRatingNote:
-			'Battlegrounds rating is not recorded in the game logs, so KFIRE measures skill by average placement and top-4 rate.'
+			'Battlegrounds rating is not recorded in the game logs, so KFIRE measures skill by average placement and top-4 rate.',
+		rlRecord: 'Rocket League record',
+		rlPlayers: 'Members reporting',
+		rlMatches: 'Matches',
+		rlGoals: 'Goals',
+		rlWinRate: 'Win rate',
+		rlSaves: 'Saves',
+		rlMvps: 'MVPs',
+		rlTimePlayed: 'Time played',
+		rlLastPlayed: 'Last played',
+		rlRankingNote:
+			'Ranked by wins. A single match won is 100%, so win rate alone would not be a ranking.',
+		rlAssists: 'Assists',
+		rlShots: 'Shots',
+		rlDemos: 'Demos',
+		rlScore: 'Score',
+		rlWin: 'Win',
+		rlLoss: 'Loss',
+		rlDraw: 'Draw',
+		rlMvpBadge: 'MVP',
+		rlBlue: 'Blue',
+		rlOrange: 'Orange',
+		rlRecentMatches: 'Recent matches',
+		rlRecordTile: 'Record'
 	},
 	playerGame: {
 		loading: 'Loading...',

@@ -179,7 +179,30 @@ export const fr: Catalog = {
 		hsModeConstructed: 'Construit',
 		hsModeArena: 'Arène',
 		hsRatingNote:
-			"La cote de Bataille de Champions n'est pas inscrite dans les journaux du jeu, KFIRE mesure donc le niveau par la position moyenne et le taux de top 4."
+			"La cote de Bataille de Champions n'est pas inscrite dans les journaux du jeu, KFIRE mesure donc le niveau par la position moyenne et le taux de top 4.",
+		rlRecord: 'Bilan Rocket League',
+		rlPlayers: 'Membres qui remontent',
+		rlMatches: 'Matchs',
+		rlGoals: 'Buts',
+		rlWinRate: 'Taux de victoire',
+		rlSaves: 'Arrêts',
+		rlMvps: 'MVP',
+		rlTimePlayed: 'Temps joué',
+		rlLastPlayed: 'Dernière partie',
+		rlRankingNote:
+			"Classé par victoires. Un seul match gagné fait 100 %, donc le taux seul ne serait pas un classement.",
+		rlAssists: 'Passes',
+		rlShots: 'Tirs',
+		rlDemos: 'Démolitions',
+		rlScore: 'Score',
+		rlWin: 'Victoire',
+		rlLoss: 'Défaite',
+		rlDraw: 'Match nul',
+		rlMvpBadge: 'MVP',
+		rlBlue: 'Bleu',
+		rlOrange: 'Orange',
+		rlRecentMatches: 'Dernières parties',
+		rlRecordTile: 'Bilan'
 	},
 	playerGame: {
 		loading: 'Chargement...',
