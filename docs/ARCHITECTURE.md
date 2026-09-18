@@ -121,6 +121,25 @@ KFIRE that takes data from one member's machine and relays it to everyone
 else's screen: a hostile or broken client must not be able to flood the
 guild's browsers.
 
+**A live state does not have to come from a client.** Rocket League is PUSHED by the
+member's own machine over this socket; League of Legends is PULLED by the server from
+Riot's Spectator API, and reaches the hub through `Hub.PublishLive` instead. The visibility
+rule is identical either way: a member who asked not to be seen is not seen, whoever the
+state came from. A pulled state is not passed through `livestate.Registry`, because a
+registry exists to shape what an untrusted client sent, and this one is built by our own
+code from a typed answer.
+
+Two consequences worth knowing:
+
+- **The source declares its own lifetime** (`State.TTL`). The default is sized for a client
+  sampling twice a second; a poller running once a minute would otherwise be swept away
+  between two samples and its card would blink.
+- **Visibility is read from the database when the hub has never seen the member on a
+  connection.** `liveVisible` is filled at authentication, which was enough while every
+  state arrived over a socket. A member playing League with no KFIRE client running has no
+  entry, and a plain map lookup would read the zero value and refuse them forever, making
+  the whole pulled path silently mute in exactly the case it exists to serve.
+
 The state is kept in memory next to presence, expires if no
 update refreshes it within `liveTTL`, and is swept on a timer
 (`Hub.SweepLive`, started from `cmd/kfire-server/main.go`) so a game that
@@ -128,6 +147,27 @@ crashes without closing the socket doesn't leave a frozen score on screen
 forever. It is also cut immediately, not just on expiry, the moment a member
 chooses to be invisible (`Hub.SetVisibility`): a member who asks not to be
 seen must stop being seen right away, not at the next reconnect.
+
+## The Riot quota
+
+KFIRE holds a personal Riot API key, whose binding limit is about 100 calls per two
+minutes. **One limiter, inside `riot.Connector.get`**, paces every call: the hourly refresh,
+the live poller and the history backfill all queue behind the same cursor, because the quota
+belongs to the key and not to a caller.
+
+It is a spacing limiter rather than a token bucket on purpose: a bucket lets a burst
+through, and a burst is what gets a key throttled. A 429 answer pushes EVERY pending caller
+back, not just the one that was refused, and is then retried: a 429 means "later", not "no".
+
+Being throttled is expensive out of proportion to being slow, because it hits every League
+surface at once, including the live poller that other members are watching.
+
+**The backfill is the lowest priority consumer.** It walks a member's whole match history,
+one page of 100 at a time, every two minutes, and it can take hours. Two properties make
+that acceptable: its cursor is stored after every page, so a restart resumes instead of
+starting over; and a transient failure abandons the page WITHOUT moving the cursor. That
+last point is not a detail -- skipping a match on a rate limit would move the cursor past
+history that nothing would ever walk again, carving a permanent hole nobody could audit.
 
 ## Key data
 
