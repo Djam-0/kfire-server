@@ -1,0 +1,134 @@
+package store
+
+import (
+	"context"
+	"time"
+)
+
+// RecapMatchOwner is the member a match CAME FROM, and nothing more.
+//
+// There is deliberately no notion of teammate or opponent anywhere in this
+// file. The match tables have no column able to hold another player, by
+// design; inferring a line-up from two members having played at the same
+// minute would be a guess served as a fact, and two members can perfectly well
+// play on their own side at the same moment.
+type RecapMatchOwner struct {
+	UserID    string
+	Username  string
+	AvatarURL *string
+}
+
+// RecapGame identifies the game a match belongs to, so a single timeline can
+// mix games without the caller having to look each one up.
+type RecapGame struct {
+	GameID   string
+	GameSlug string
+	GameName string
+}
+
+// RecapRocketLeagueMatch is one Rocket League match played inside a recap
+// window. The statistics are the reporting member's own, as stored.
+type RecapRocketLeagueMatch struct {
+	RecapMatchOwner
+	RecapGame
+	Playlist        *int
+	TeamSize        int
+	PlayerTeam      int
+	TeamBlueScore   int
+	TeamOrangeScore int
+	Result          string
+	Goals           int
+	Assists         int
+	Saves           int
+	Shots           int
+	Score           int
+	Demos           int
+	MVP             bool
+	DurationSeconds int
+	PlayedAt        time.Time
+}
+
+// RecapHearthstoneMatch is one Hearthstone match played inside a recap window.
+type RecapHearthstoneMatch struct {
+	RecapMatchOwner
+	RecapGame
+	Mode       string
+	Result     string
+	Turns      *int
+	Placement  *int
+	HeroCardID *string
+	PlayedAt   time.Time
+}
+
+// RocketLeagueMatchesBetween returns every member's Rocket League matches in
+// [from, to), oldest first: a recap is read in the order the evening happened.
+//
+// The window is half-open so two adjacent windows neither drop nor double a
+// match played exactly on their shared bound.
+//
+// Banned members are excluded, as in every other aggregate of the portal.
+func (s *Store) RocketLeagueMatchesBetween(ctx context.Context, from, to time.Time) ([]RecapRocketLeagueMatch, error) {
+	rows, err := s.pool.Query(ctx, `
+		SELECT m.user_id, u.username, u.avatar_url,
+		       m.game_id, g.slug, g.name,
+		       m.playlist, m.team_size, m.player_team,
+		       m.team_blue_score, m.team_orange_score, m.result,
+		       m.goals, m.assists, m.saves, m.shots, m.score, m.demos,
+		       m.mvp, m.duration_seconds, m.played_at
+		FROM rocket_league_matches m
+		JOIN users u ON u.id = m.user_id AND u.banned_at IS NULL
+		JOIN games g ON g.id = m.game_id
+		WHERE m.played_at >= $1 AND m.played_at < $2
+		ORDER BY m.played_at ASC, u.username ASC`, from, to)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var out []RecapRocketLeagueMatch
+	for rows.Next() {
+		var m RecapRocketLeagueMatch
+		if err := rows.Scan(&m.UserID, &m.Username, &m.AvatarURL,
+			&m.GameID, &m.GameSlug, &m.GameName,
+			&m.Playlist, &m.TeamSize, &m.PlayerTeam,
+			&m.TeamBlueScore, &m.TeamOrangeScore, &m.Result,
+			&m.Goals, &m.Assists, &m.Saves, &m.Shots, &m.Score, &m.Demos,
+			&m.MVP, &m.DurationSeconds, &m.PlayedAt); err != nil {
+			return nil, err
+		}
+		out = append(out, m)
+	}
+	return out, rows.Err()
+}
+
+// HearthstoneMatchesBetween returns every member's Hearthstone matches in
+// [from, to), oldest first. Same window and same exclusions as its Rocket
+// League counterpart.
+func (s *Store) HearthstoneMatchesBetween(ctx context.Context, from, to time.Time) ([]RecapHearthstoneMatch, error) {
+	rows, err := s.pool.Query(ctx, `
+		SELECT m.user_id, u.username, u.avatar_url,
+		       m.game_id, g.slug, g.name,
+		       m.mode, m.result, m.turns, m.placement, m.hero_card_id, m.played_at
+		FROM hearthstone_matches m
+		JOIN users u ON u.id = m.user_id AND u.banned_at IS NULL
+		JOIN games g ON g.id = m.game_id
+		WHERE m.played_at >= $1 AND m.played_at < $2
+		ORDER BY m.played_at ASC, u.username ASC`, from, to)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var out []RecapHearthstoneMatch
+	for rows.Next() {
+		var m RecapHearthstoneMatch
+		if err := rows.Scan(&m.UserID, &m.Username, &m.AvatarURL,
+			&m.GameID, &m.GameSlug, &m.GameName,
+			&m.Mode, &m.Result, &m.Turns, &m.Placement, &m.HeroCardID,
+			&m.PlayedAt); err != nil {
+			return nil, err
+		}
+		out = append(out, m)
+	}
+	return out, rows.Err()
+}
