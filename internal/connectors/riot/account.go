@@ -71,40 +71,53 @@ func (c *Connector) get(ctx context.Context, host, path string, out any) error {
 	endpoint := fmt.Sprintf(c.APIHostTmpl, host) + path
 	var last error
 	for attempt := 0; attempt <= maxRetries; attempt++ {
-		if c.limiter != nil {
-			if err := c.limiter.wait(ctx); err != nil {
-				return err
-			}
-		}
-		req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
-		if err != nil {
-			return err
-		}
-		req.Header.Set("X-Riot-Token", c.APIKey)
-
-		res, err := c.HTTP.Do(req)
-		if err != nil {
-			return err
-		}
-		if res.StatusCode == http.StatusTooManyRequests {
-			// Slow EVERY caller down, not just this goroutine: the quota is
-			// per key. Then retry, because a 429 means "later", not "no".
-			if c.limiter != nil {
-				c.limiter.penalise(retryAfter(res))
-			}
-			body, _ := io.ReadAll(io.LimitReader(res.Body, 512))
-			res.Body.Close()
-			last = &APIError{Status: res.StatusCode, Path: path, Body: string(body)}
+		err := c.attempt(ctx, endpoint, path, out)
+		var apiErr *APIError
+		if asAPIError(err, &apiErr) && apiErr.Status == http.StatusTooManyRequests {
+			// A 429 means "later", not "no", so it is retried.
+			last = err
 			continue
 		}
-		defer res.Body.Close()
-		if res.StatusCode != http.StatusOK {
-			body, _ := io.ReadAll(io.LimitReader(res.Body, 512))
-			return &APIError{Status: res.StatusCode, Path: path, Body: string(body)}
-		}
-		return json.NewDecoder(res.Body).Decode(out)
+		return err
 	}
 	return last
+}
+
+// attempt performs one request. Split out of get so that the deferred close of
+// the response body is scoped to a single try: deferring inside the retry loop
+// would be correct only as long as every branch returned, which is exactly the
+// kind of invariant a later edit breaks silently.
+func (c *Connector) attempt(ctx context.Context, endpoint, path string, out any) error {
+	if c.limiter != nil {
+		// Waiting here, on every attempt, is what keeps a retry from being a
+		// burst: even a Retry-After of zero still queues behind the limiter's
+		// own spacing.
+		if err := c.limiter.wait(ctx); err != nil {
+			return err
+		}
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
+	if err != nil {
+		return err
+	}
+	req.Header.Set("X-Riot-Token", c.APIKey)
+
+	res, err := c.HTTP.Do(req)
+	if err != nil {
+		return err
+	}
+	defer res.Body.Close()
+
+	if res.StatusCode == http.StatusTooManyRequests && c.limiter != nil {
+		// Slow EVERY caller down, not just this goroutine: the quota belongs
+		// to the key, so one rejected call is everyone's problem.
+		c.limiter.penalise(retryAfter(res))
+	}
+	if res.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(io.LimitReader(res.Body, 512))
+		return &APIError{Status: res.StatusCode, Path: path, Body: string(body)}
+	}
+	return json.NewDecoder(res.Body).Decode(out)
 }
 
 // AccountByPUUID resolves a PUUID to its current Riot ID.
