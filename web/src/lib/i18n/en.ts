@@ -92,7 +92,8 @@ export const en = {
 	},
 	live: {
 		heading: 'Live games',
-		empty: 'Nobody is playing right now.'
+		empty: 'Nobody is playing right now.',
+		unknownMember: 'A member'
 	},
 	profile: {
 		loading: 'Loading...',

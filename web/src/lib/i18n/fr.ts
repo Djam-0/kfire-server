@@ -93,7 +93,8 @@ export const fr: Catalog = {
 	},
 	live: {
 		heading: 'Jeux en live',
-		empty: 'Personne ne joue en ce moment.'
+		empty: 'Personne ne joue en ce moment.',
+		unknownMember: 'Un membre'
 	},
 	profile: {
 		loading: 'Chargement...',

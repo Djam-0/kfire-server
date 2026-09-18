@@ -9,7 +9,8 @@
 
 	// `username` is optional: the live store is keyed by user id and presence is
 	// what puts a name on it, so a member missing from presence still gets his
-	// card, without a name, rather than disappearing from the page.
+	// card rather than disappearing from the page. A neutral label, not a blank
+	// space, because an empty name reads as a broken card, not as a missing one.
 	let { username, match }: { username?: string; match: RlLiveMatch } = $props();
 
 	let stats = $derived([
@@ -25,7 +26,7 @@
 <article class="pd-card flex flex-col gap-2 p-3">
 	<header class="flex items-center gap-2">
 		<span class="font-display min-w-0 flex-1 truncate font-semibold text-[var(--color-text)]">
-			{username ?? ''}
+			{username ?? t('live.unknownMember')}
 		</span>
 		<span
 			class="pd-cut-sm font-display shrink-0 bg-[var(--color-online)]/15 px-2 py-0.5 text-xs font-bold text-[var(--color-online)] uppercase italic"
