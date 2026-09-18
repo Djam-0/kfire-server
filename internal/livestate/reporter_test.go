@@ -11,6 +11,7 @@ import (
 type fake struct {
 	slug   string
 	err    error
+	out    map[string]any
 	gotRaw string
 }
 
@@ -20,6 +21,9 @@ func (f *fake) Shape(raw json.RawMessage) (map[string]any, error) {
 	f.gotRaw = string(raw)
 	if f.err != nil {
 		return nil, f.err
+	}
+	if f.out != nil {
+		return f.out, nil
 	}
 	return map[string]any{"ok": true}, nil
 }
@@ -98,5 +102,27 @@ func TestRegistryPropagatesTheReporterError(t *testing.T) {
 	reg := NewRegistry(&fake{slug: "rocket-league", err: boom})
 	if _, err := reg.Shape(body("rocket-league")); !errors.Is(err, boom) {
 		t.Errorf("Shape() = %v, want boom", err)
+	}
+}
+
+func TestRegistryRefusesAnOversizedReturn(t *testing.T) {
+	// Le plafond vaut aussi pour ce que rend un rapporteur : ce qu'il rend est
+	// diffusé tel quel, et un rapporteur défaillant ne doit pas pouvoir en
+	// décider seul.
+	big := &fake{slug: "rocket-league", out: map[string]any{"x": strings.Repeat("a", MaxPayload)}}
+	reg := NewRegistry(big)
+	if _, err := reg.Shape(body("rocket-league")); !errors.Is(err, ErrInvalidLive) {
+		t.Error("un rapporteur qui rend trop gros doit être refusé")
+	}
+}
+
+func TestRegistryRefusesAnEndSignalForAnUnknownGame(t *testing.T) {
+	// Un jeu que personne ne revendique n'a jamais pu créer d'état en cours,
+	// puisque ses états normaux sont refusés. Son signal de fin n'a donc rien
+	// à effacer, et l'accepter laisserait un client effacer le match d'un
+	// autre jeu : l'état est indexé par membre, pas par jeu.
+	reg := NewRegistry(&fake{slug: "rocket-league"})
+	if _, err := reg.Shape(json.RawMessage(`{"game_slug":"minecraft","ended":true}`)); !errors.Is(err, ErrUnknownGame) {
+		t.Errorf("Shape() = %v, want ErrUnknownGame", err)
 	}
 }

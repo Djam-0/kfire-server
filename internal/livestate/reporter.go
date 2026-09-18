@@ -41,7 +41,9 @@ type Reporter interface {
 
 	// Shape validates the game-specific payload and returns what will be
 	// broadcast, or ErrInvalidLive. What it returns IS what browsers see: a
-	// reporter never broadcasts more than it validated.
+	// reporter MUST broadcast no more than it validated. The registry does
+	// not take that on trust: it measures what comes back and enforces the
+	// same MaxPayload bound on it.
 	Shape(raw json.RawMessage) (map[string]any, error)
 }
 
@@ -80,10 +82,6 @@ func NewRegistry(reporters ...Reporter) *Registry {
 
 // Shape validates the common envelope, then hands the payload to the reporter
 // claiming its slug.
-//
-// The end signal never reaches a reporter: a match ending is the same fact in
-// every game, and letting each one re-implement it would be a way for one of
-// them to get it wrong.
 func (r *Registry) Shape(raw json.RawMessage) (State, error) {
 	if len(raw) > MaxPayload {
 		return State{}, ErrInvalidLive
@@ -95,17 +93,32 @@ func (r *Registry) Shape(raw json.RawMessage) (State, error) {
 	if !slugPattern.MatchString(e.GameSlug) {
 		return State{}, ErrInvalidLive
 	}
-	if e.Ended {
-		return State{Slug: e.GameSlug, Ended: true}, nil
-	}
 
 	rep, ok := r.bySlug[e.GameSlug]
 	if !ok {
 		return State{}, ErrUnknownGame
 	}
+	if e.Ended {
+		// The reporter is resolved but never consulted: a match ending is the
+		// same fact in every game, and letting each one re-implement it would
+		// be a way for one of them to get it wrong. Resolving it anyway keeps
+		// the two paths consistent, and a game nobody claims can have no live
+		// entry to end.
+		return State{Slug: e.GameSlug, Ended: true}, nil
+	}
 	match, err := rep.Shape(raw)
 	if err != nil {
 		return State{}, err
+	}
+	// The cap is applied to the reporter's OUTPUT too, not only to the client's
+	// input. What comes back is broadcast verbatim to every browser in the org,
+	// and a reporter that amplifies its input, keeps state across calls or
+	// simply has a bug would otherwise decide that size on its own. Measuring
+	// costs a marshal of a few hundred bytes twice a second; trusting every
+	// future reporter costs a guarantee.
+	out, err := json.Marshal(match)
+	if err != nil || len(out) > MaxPayload {
+		return State{}, ErrInvalidLive
 	}
 	return State{Slug: e.GameSlug, Match: match}, nil
 }
