@@ -47,9 +47,30 @@ type RocketLeagueMemberStats struct {
 	LastPlayedAt time.Time
 }
 
-// InsertRocketLeagueMatch writes a match. An already-sent match is silently
-// ignored: the client's local queue can re-emit after a reconnect, and the
-// uniqueness constraint on (user_id, played_at) is what makes that safe.
+// duplicateWindow is how close two identical matches must be for the second
+// to be treated as a repeat of the first rather than a real game.
+//
+// Three minutes is far shorter than any real match and far longer than the
+// gap between a client's two reports, so it cannot swallow a genuine game: a
+// member would have to finish a second match with the very same score AND the
+// very same six statistics within three minutes of the first.
+const duplicateWindow = 3 * time.Minute
+
+// InsertRocketLeagueMatch writes a match, unless the member has just reported
+// exactly the same one.
+//
+// Two guards, against two different mistakes. The uniqueness on
+// (user_id, played_at) covers a client re-sending a queued match after a
+// reconnect, which carries the same timestamp.
+//
+// The second guard covers something the first cannot see. The client stamps
+// played_at when it REPORTS, not when the match ended, so a match reported
+// twice a few seconds apart carries two different timestamps and slips past
+// any uniqueness constraint. That happens today: the game signals the end of a
+// match twice, as MatchEnded and again as MatchDestroyed, and clients up to
+// v0.6.0-beta.3 report on both -- the second time with a duration reset to
+// near zero. This guard is what keeps those out of members' statistics without
+// waiting for every client to be updated.
 func (s *Store) InsertRocketLeagueMatch(ctx context.Context, m RocketLeagueMatch) error {
 	_, err := s.pool.Exec(ctx, `
 		INSERT INTO rocket_league_matches
@@ -57,12 +78,26 @@ func (s *Store) InsertRocketLeagueMatch(ctx context.Context, m RocketLeagueMatch
 			 team_blue_score, team_orange_score, result,
 			 goals, assists, saves, shots, score, demos,
 			 mvp, duration_seconds, played_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
+		SELECT $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17
+		WHERE NOT EXISTS (
+			SELECT 1 FROM rocket_league_matches
+			 WHERE user_id = $1
+			   AND played_at > $17::timestamptz - $18::interval
+			   AND result = $8
+			   AND team_blue_score = $6
+			   AND team_orange_score = $7
+			   AND goals = $9
+			   AND assists = $10
+			   AND saves = $11
+			   AND shots = $12
+			   AND score = $13
+			   AND demos = $14
+		)
 		ON CONFLICT (user_id, played_at) DO NOTHING`,
 		m.UserID, m.GameID, m.Playlist, m.TeamSize, m.PlayerTeam,
 		m.TeamBlueScore, m.TeamOrangeScore, m.Result,
 		m.Goals, m.Assists, m.Saves, m.Shots, m.Score, m.Demos,
-		m.MVP, m.DurationSeconds, m.PlayedAt)
+		m.MVP, m.DurationSeconds, m.PlayedAt, duplicateWindow)
 	return err
 }
 
