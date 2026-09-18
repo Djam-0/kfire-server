@@ -7,6 +7,8 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"strconv"
+	"time"
 )
 
 // Account is one Riot account's identity.
@@ -40,26 +42,69 @@ func NotFound(err error) bool {
 	return e.Status == http.StatusNotFound
 }
 
+// maxRetries bounds how many times a 429 is retried before giving up. Three
+// is enough to ride out a burst; beyond that the key is genuinely saturated
+// and the caller must hear about it rather than block a request forever.
+const maxRetries = 3
+
+// retryAfter reads Riot's Retry-After header, in seconds.
+//
+// Riot does not always send it, so a missing or unreadable header falls back
+// to a second rather than to zero: retrying immediately is what got us
+// throttled.
+func retryAfter(res *http.Response) time.Duration {
+	if v := res.Header.Get("Retry-After"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n >= 0 {
+			return time.Duration(n) * time.Second
+		}
+	}
+	return time.Second
+}
+
 // get performs an authenticated GET against one Riot host and decodes the body
 // into out. host is either a platform (euw1) or a cluster (europe).
+//
+// Every call waits for the connector's limiter first, so callers never have to
+// think about the quota: RecentMatches fetching details in parallel and the
+// backfill walking thousands of matches queue behind the same cursor.
 func (c *Connector) get(ctx context.Context, host, path string, out any) error {
 	endpoint := fmt.Sprintf(c.APIHostTmpl, host) + path
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
-	if err != nil {
-		return err
-	}
-	req.Header.Set("X-Riot-Token", c.APIKey)
+	var last error
+	for attempt := 0; attempt <= maxRetries; attempt++ {
+		if c.limiter != nil {
+			if err := c.limiter.wait(ctx); err != nil {
+				return err
+			}
+		}
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
+		if err != nil {
+			return err
+		}
+		req.Header.Set("X-Riot-Token", c.APIKey)
 
-	res, err := c.HTTP.Do(req)
-	if err != nil {
-		return err
+		res, err := c.HTTP.Do(req)
+		if err != nil {
+			return err
+		}
+		if res.StatusCode == http.StatusTooManyRequests {
+			// Slow EVERY caller down, not just this goroutine: the quota is
+			// per key. Then retry, because a 429 means "later", not "no".
+			if c.limiter != nil {
+				c.limiter.penalise(retryAfter(res))
+			}
+			body, _ := io.ReadAll(io.LimitReader(res.Body, 512))
+			res.Body.Close()
+			last = &APIError{Status: res.StatusCode, Path: path, Body: string(body)}
+			continue
+		}
+		defer res.Body.Close()
+		if res.StatusCode != http.StatusOK {
+			body, _ := io.ReadAll(io.LimitReader(res.Body, 512))
+			return &APIError{Status: res.StatusCode, Path: path, Body: string(body)}
+		}
+		return json.NewDecoder(res.Body).Decode(out)
 	}
-	defer res.Body.Close()
-	if res.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(io.LimitReader(res.Body, 512))
-		return &APIError{Status: res.StatusCode, Path: path, Body: string(body)}
-	}
-	return json.NewDecoder(res.Body).Decode(out)
+	return last
 }
 
 // AccountByPUUID resolves a PUUID to its current Riot ID.

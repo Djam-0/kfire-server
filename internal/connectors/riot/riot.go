@@ -61,6 +61,11 @@ type Connector struct {
 	APIKey      string
 	APIHostTmpl string
 	HTTP        *http.Client
+
+	// limiter paces every call. It lives on the connector, not on a caller, so
+	// the hourly refresh, the live poller and the backfill share ONE quota,
+	// which is the only thing Riot actually meters.
+	limiter *limiter
 }
 
 // New returns a connector. It is disabled until apiKey is set.
@@ -69,8 +74,13 @@ func New(apiKey string) *Connector {
 		APIKey:      apiKey,
 		APIHostTmpl: defaultAPIHostTmpl,
 		HTTP:        &http.Client{Timeout: 15 * time.Second},
+		limiter:     newLimiter(defaultRate),
 	}
 }
+
+// SetRate overrides the call rate. For tests only: production keeps the
+// conservative default, because a throttled key breaks every League surface.
+func (c *Connector) SetRate(perSecond float64) { c.limiter = newLimiter(perSecond) }
 
 // Enabled reports whether the API key is configured.
 func (c *Connector) Enabled() bool {
