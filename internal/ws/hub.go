@@ -530,8 +530,13 @@ func (c *client) handleLiveMatch(h *Hub, env Envelope) {
 	}
 
 	if s.Ended {
-		h.clearLive(c.userID)
-		h.Broadcast("live_match", map[string]any{"user_id": c.userID, "match": nil})
+		// Only announce an ending that actually erased something: a client
+		// reporting the end of a game the hub is not showing has nothing to
+		// take off anyone's screen, and broadcasting it would take down the
+		// card of the game that IS in progress.
+		if h.clearLive(c.userID, s.Slug) {
+			h.Broadcast("live_match", map[string]any{"user_id": c.userID, "match": nil})
+		}
 		return
 	}
 
@@ -553,17 +558,27 @@ func (h *Hub) setLive(userID string, s livestate.State) {
 	h.live[userID] = liveEntry{slug: s.Slug, match: s.Match, updatedAt: time.Now(), ttl: s.TTL}
 }
 
-// clearLive forgets a member's live match and says whether there was one.
+// clearLive forgets a member's live match for one game, and says whether there
+// was one to forget.
 //
 // Named rather than inlined in the handler so the end of a match is a thing the
 // hub does, and a thing a test can call. Ending is the visible half of the
 // feature: it is what makes a card disappear from the portal.
-func (h *Hub) clearLive(userID string) bool {
+//
+// The slug is not decoration. The entry is indexed by member, not by game, so a
+// member can only hold one live state at a time, but the END of a game is
+// announced by whichever game finished. Without this check, a member playing
+// Hearthstone and Rocket League at once would see one game's ending wipe the
+// other's card off the whole guild's screens.
+func (h *Hub) clearLive(userID, slug string) bool {
 	h.mu.Lock()
 	defer h.mu.Unlock()
-	_, had := h.live[userID]
+	e, had := h.live[userID]
+	if !had || e.slug != slug {
+		return false
+	}
 	delete(h.live, userID)
-	return had
+	return true
 }
 
 // setLiveVisible stores what a member allows for their live match.
@@ -754,7 +769,7 @@ func (c *client) closeWithError(closeCode int, code, message string) {
 // so there is nothing to validate that the compiler has not already checked.
 func (h *Hub) PublishLive(ctx context.Context, userID string, s livestate.State) {
 	if s.Ended {
-		if h.clearLive(userID) {
+		if h.clearLive(userID, s.Slug) {
 			h.Broadcast("live_match", h.liveJSON(userID))
 		}
 		return
