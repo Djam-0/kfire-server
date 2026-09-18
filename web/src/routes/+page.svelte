@@ -1,50 +1,18 @@
 <script lang="ts">
-	import { onMount, onDestroy } from 'svelte';
-	import { get } from 'svelte/store';
-	import { api, type PresenceEntry } from '$lib/api';
-	import { auth } from '$lib/stores/auth.svelte';
-	import { connectPresence, type PresenceSocket } from '$lib/ws';
+	import { presence } from '$lib/stores/presence.svelte';
 	import { timeAgo } from '$lib/format';
 	import Avatar from '$lib/components/Avatar.svelte';
 	import StatusBadge from '$lib/components/StatusBadge.svelte';
 	import { t } from '$lib/i18n';
 
-	let entries = $state<Map<string, PresenceEntry>>(new Map());
-	let wsStatus = $state<'connecting' | 'connected' | 'disconnected'>('connecting');
-	let loading = $state(true);
-	let socket: PresenceSocket | null = null;
-
 	const rank = { in_game: 0, online: 1, offline: 2 };
 	let sorted = $derived(
-		[...entries.values()].sort(
+		presence.list.sort(
 			(a, b) => rank[a.status] - rank[b.status] || a.username.localeCompare(b.username)
 		)
 	);
 	let playing = $derived(sorted.filter((e) => e.status === 'in_game').length);
 	let online = $derived(sorted.filter((e) => e.status !== 'offline').length);
-
-	onMount(async () => {
-		try {
-			const snapshot = await api.getPresence();
-			const map = new Map<string, PresenceEntry>();
-			for (const e of snapshot) map.set(e.user_id, e);
-			entries = map;
-		} finally {
-			loading = false;
-		}
-
-		socket = connectPresence(
-			() => get(auth).accessToken,
-			(entry) => {
-				const next = new Map(entries);
-				next.set(entry.user_id, entry);
-				entries = next;
-			},
-			(status) => (wsStatus = status)
-		);
-	});
-
-	onDestroy(() => socket?.close());
 </script>
 
 <div class="mb-5 flex items-center justify-between">
@@ -58,17 +26,17 @@
 	</div>
 	<span class="inline-flex items-center gap-1.5 text-xs text-[var(--color-muted)]" title={t('dashboard.liveConnection')}>
 		<span
-			class="h-2 w-2 rounded-full {wsStatus === 'connected'
+			class="h-2 w-2 rounded-full {presence.status === 'connected'
 				? 'bg-[var(--color-online)]'
-				: wsStatus === 'connecting'
+				: presence.status === 'connecting'
 					? 'bg-yellow-500'
 					: 'bg-[var(--color-muted)]'}"
 		></span>
-		{wsStatus === 'connected' ? t('dashboard.live') : wsStatus === 'connecting' ? t('dashboard.connecting') : t('dashboard.disconnected')}
+		{presence.status === 'connected' ? t('dashboard.live') : presence.status === 'connecting' ? t('dashboard.connecting') : t('dashboard.disconnected')}
 	</span>
 </div>
 
-{#if loading}
+{#if !presence.loaded}
 	<p class="text-[var(--color-muted)]">{t('dashboard.loading')}</p>
 {:else if sorted.length === 0}
 	<p class="text-[var(--color-muted)]">{t('dashboard.noMembers')}</p>

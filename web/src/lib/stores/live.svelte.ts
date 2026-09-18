@@ -37,6 +37,12 @@ function remove(userId: string): void {
 	entries = next;
 }
 
+/** Drops every match. Used on sign-out, so the next account never inherits the
+ * previous one's matches while waiting for the first sample. */
+function clear(): void {
+	entries = new Map();
+}
+
 export const liveMatches = {
 	/** The current live match for a member, if any. */
 	get(userId: string): LiveEntry | undefined {
@@ -55,5 +61,6 @@ export const liveMatches = {
 		return entries.size;
 	},
 	apply,
-	remove
+	remove,
+	clear
 };

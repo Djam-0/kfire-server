@@ -1,9 +1,13 @@
 <script lang="ts">
 	import '../app.css';
-	import { onMount } from 'svelte';
+	import { onMount, onDestroy } from 'svelte';
+	import { get } from 'svelte/store';
 	import { page } from '$app/state';
 	import { auth } from '$lib/stores/auth.svelte';
-	import { getConfig } from '$lib/api';
+	import { api, getConfig } from '$lib/api';
+	import { connectPresence, type PresenceSocket } from '$lib/ws';
+	import { presence } from '$lib/stores/presence.svelte';
+	import { liveMatches } from '$lib/stores/live.svelte';
 	import Avatar from '$lib/components/Avatar.svelte';
 	import Login from '$lib/components/Login.svelte';
 	import Footer from '$lib/components/Footer.svelte';
@@ -31,6 +35,49 @@
 			/* keep defaults when config is unavailable */
 		}
 	});
+
+	// The layout owns the one and only presence socket, because the nav lives on
+	// every page and needs live counts there. Pages read the stores instead of
+	// opening their own connection.
+	let socket: PresenceSocket | null = null;
+	// Which user the socket was opened for. The auth store emits on every token
+	// refresh and profile edit, so the effect below reacts to identity changes
+	// only; comparing against this guard is what keeps a single socket alive
+	// instead of tearing one down and reopening it on each emission.
+	let socketUserId: string | null = null;
+
+	async function openSocket(userId: string) {
+		try {
+			presence.hydrate(await api.getPresence());
+		} catch {
+			// The socket refills the store from the next updates.
+			presence.hydrate([]);
+		}
+		// Auth may have changed while the snapshot was in flight.
+		if (socketUserId !== userId) return;
+		socket = connectPresence(
+			() => get(auth).accessToken,
+			(entry) => presence.apply(entry),
+			(status) => presence.setStatus(status),
+			(update) => liveMatches.apply(update)
+		);
+	}
+
+	$effect(() => {
+		const userId = $auth.user?.id ?? null;
+		if (userId === socketUserId) return;
+		socketUserId = userId;
+		socket?.close();
+		socket = null;
+		if (userId) {
+			openSocket(userId);
+		} else {
+			presence.clear();
+			liveMatches.clear();
+		}
+	});
+
+	onDestroy(() => socket?.close());
 
 	let navItems = $derived([
 		{ href: '/', label: t('nav.dashboard') },
