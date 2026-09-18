@@ -67,7 +67,23 @@ type RecapHearthstoneMatch struct {
 // match played exactly on their shared bound.
 //
 // Banned members are excluded, as in every other aggregate of the portal.
-func (s *Store) RocketLeagueMatchesBetween(ctx context.Context, from, to time.Time) ([]RecapRocketLeagueMatch, error) {
+// RecapViewer is who is asking for a recap, which decides whose matches they
+// are allowed to see.
+//
+// A recap lists, minute by minute, what a member played during an evening.
+// That is a listing of recent sessions in everything but name, so it honours
+// the same toggle the sessions endpoint does: a member who turned
+// sessions_visible off asked not to be shown, and 2 of the guild's 34 members
+// actually have. Aggregates are filtered too, not just the timeline: saying
+// "six matches this evening" would give away exactly what the toggle hides.
+//
+// A member always sees themselves, and an admin sees everyone, as elsewhere.
+type RecapViewer struct {
+	UserID  string
+	IsAdmin bool
+}
+
+func (s *Store) RocketLeagueMatchesBetween(ctx context.Context, from, to time.Time, v RecapViewer) ([]RecapRocketLeagueMatch, error) {
 	rows, err := s.pool.Query(ctx, `
 		SELECT m.user_id, u.username, u.avatar_url,
 		       m.game_id, g.slug, g.name,
@@ -77,9 +93,10 @@ func (s *Store) RocketLeagueMatchesBetween(ctx context.Context, from, to time.Ti
 		       m.mvp, m.duration_seconds, m.played_at
 		FROM rocket_league_matches m
 		JOIN users u ON u.id = m.user_id AND u.banned_at IS NULL
+		                       AND (u.sessions_visible OR u.id = $3 OR $4)
 		JOIN games g ON g.id = m.game_id
 		WHERE m.played_at >= $1 AND m.played_at < $2
-		ORDER BY m.played_at ASC, u.username ASC`, from, to)
+		ORDER BY m.played_at ASC, u.username ASC`, from, to, v.UserID, v.IsAdmin)
 	if err != nil {
 		return nil, err
 	}
@@ -104,16 +121,17 @@ func (s *Store) RocketLeagueMatchesBetween(ctx context.Context, from, to time.Ti
 // HearthstoneMatchesBetween returns every member's Hearthstone matches in
 // [from, to), oldest first. Same window and same exclusions as its Rocket
 // League counterpart.
-func (s *Store) HearthstoneMatchesBetween(ctx context.Context, from, to time.Time) ([]RecapHearthstoneMatch, error) {
+func (s *Store) HearthstoneMatchesBetween(ctx context.Context, from, to time.Time, v RecapViewer) ([]RecapHearthstoneMatch, error) {
 	rows, err := s.pool.Query(ctx, `
 		SELECT m.user_id, u.username, u.avatar_url,
 		       m.game_id, g.slug, g.name,
 		       m.mode, m.result, m.turns, m.placement, m.hero_card_id, m.played_at
 		FROM hearthstone_matches m
 		JOIN users u ON u.id = m.user_id AND u.banned_at IS NULL
+		                       AND (u.sessions_visible OR u.id = $3 OR $4)
 		JOIN games g ON g.id = m.game_id
 		WHERE m.played_at >= $1 AND m.played_at < $2
-		ORDER BY m.played_at ASC, u.username ASC`, from, to)
+		ORDER BY m.played_at ASC, u.username ASC`, from, to, v.UserID, v.IsAdmin)
 	if err != nil {
 		return nil, err
 	}

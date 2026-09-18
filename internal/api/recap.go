@@ -375,11 +375,16 @@ func (h *handlers) recap(c *fiber.Ctx) error {
 		return errorJSON(c, fiber.StatusBadRequest, "invalid_range", msg)
 	}
 
-	rl, err := h.store.RocketLeagueMatchesBetween(c.Context(), w.From, w.To)
+	// Who is asking decides whose matches they may see: a recap is a listing of
+	// recent sessions, so it honours the same privacy toggle they do.
+	claims := mustClaims(c)
+	viewer := store.RecapViewer{UserID: claims.UserID, IsAdmin: claims.Role == "admin"}
+
+	rl, err := h.store.RocketLeagueMatchesBetween(c.Context(), w.From, w.To, viewer)
 	if err != nil {
 		return err
 	}
-	hs, err := h.store.HearthstoneMatchesBetween(c.Context(), w.From, w.To)
+	hs, err := h.store.HearthstoneMatchesBetween(c.Context(), w.From, w.To, viewer)
 	if err != nil {
 		return err
 	}
