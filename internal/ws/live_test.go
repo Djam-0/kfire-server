@@ -91,6 +91,32 @@ func TestLiveConcurrentAccess(t *testing.T) {
 	wg.Wait()
 }
 
+func TestSweepForgetsAMatchThatWentQuiet(t *testing.T) {
+	// Le jeu d'un membre plante mais KFIRE reste connecté : la socket ne se
+	// ferme pas, donc unregister ne passe jamais. Sans le balayage, sa carte
+	// resterait figée à l'écran de toute la guilde.
+	h := NewHub(nil, nil, "", nil, nil)
+	h.setLive("frais", livestate.State{Slug: "rocket-league", Match: map[string]any{"x": 1}})
+	h.setLive("perdu", livestate.State{Slug: "rocket-league", Match: map[string]any{"x": 2}})
+
+	h.mu.Lock()
+	e := h.live["perdu"]
+	e.updatedAt = time.Now().Add(-liveTTL - time.Second)
+	h.live["perdu"] = e
+	h.mu.Unlock()
+
+	ended := h.sweepExpired(time.Now())
+	if len(ended) != 1 || ended[0] != "perdu" {
+		t.Fatalf("balayés = %v, want [perdu]", ended)
+	}
+	if h.LiveMatch("perdu") != nil {
+		t.Error("un état expiré doit disparaître")
+	}
+	if h.LiveMatch("frais") == nil {
+		t.Error("un état frais ne doit PAS être balayé")
+	}
+}
+
 func TestLiveVisibilityCutsTheStream(t *testing.T) {
 	h := NewHub(nil, nil, "", nil, nil)
 	h.setLiveVisible("u1", true, "online")

@@ -646,15 +646,7 @@ func (h *Hub) SweepLive(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case now := <-t.C:
-			h.mu.Lock()
-			var ended []string
-			for id, e := range h.live {
-				if e.expired(now) {
-					ended = append(ended, id)
-					delete(h.live, id)
-				}
-			}
-			h.mu.Unlock()
+			ended := h.sweepExpired(now)
 			// Outside the lock: Broadcast takes h.mu for reading, and an
 			// RWMutex is not reentrant.
 			for _, id := range ended {
@@ -662,6 +654,27 @@ func (h *Hub) SweepLive(ctx context.Context) {
 			}
 		}
 	}
+}
+
+// sweepExpired forgets every live match that has gone without a sample for
+// longer than liveTTL, and returns whose they were.
+//
+// Named and returning its casualties for the same reason clearLive is named: a
+// test can call it, and the caller can announce the ends outside the lock. The
+// sweep guards the case nothing else catches, a member whose game crashes while
+// KFIRE stays connected: the socket never closes, so unregister never runs, and
+// without this the card would sit frozen on the whole guild's screen.
+func (h *Hub) sweepExpired(now time.Time) []string {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	var ended []string
+	for id, e := range h.live {
+		if e.expired(now) {
+			ended = append(ended, id)
+			delete(h.live, id)
+		}
+	}
+	return ended
 }
 
 // sendEnvelope queues a typed message for this client.
