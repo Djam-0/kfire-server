@@ -18,6 +18,7 @@ export const en = {
 		leaderboards: 'Leaderboards',
 		games: 'Games',
 		live: 'Live games',
+		recap: 'Session recap',
 		download: 'Get the app',
 		admin: 'Admin',
 		account: 'Account'
@@ -94,6 +95,45 @@ export const en = {
 		heading: 'Live games',
 		empty: 'Nobody is playing right now.',
 		unknownMember: 'A member'
+	},
+	recap: {
+		title: 'Session recap',
+		subtitle: 'Pick a range and see what the guild played during it.',
+		from: 'Start',
+		to: 'End',
+		apply: 'Show',
+		loading: 'Loading the recap...',
+		empty: 'No match was reported over this range.',
+		totalMatches: '{count} matches reported',
+		summary: 'Summary',
+		timeline: 'Timeline',
+		ownerNote: 'Each line names the member the match came from, and nothing else.',
+		member: 'Member',
+		matches: 'Matches',
+		record: 'W-L-D',
+		time: 'Time',
+		game: 'Game',
+		detail: 'Detail',
+		noDetail: 'No detail for this game yet.',
+		none: 'n/a',
+		rl: {
+			goals: 'Goals',
+			assists: 'Assists',
+			saves: 'Saves',
+			shots: 'Shots',
+			demos: 'Demos',
+			mvps: 'MVP',
+			score: 'Score',
+			playTime: 'Play time'
+		},
+		hs: {
+			ranked: 'Placed',
+			avgPlacement: 'Avg. place',
+			top4: 'Top 4',
+			hero: 'Hero',
+			turns: 'Turns',
+			placement: 'Place'
+		}
 	},
 	profile: {
 		loading: 'Loading...',
