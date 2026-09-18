@@ -71,7 +71,7 @@ func (r *liveRegistry) get(userID string) *riot.LiveGame {
 // An interface rather than the hub itself, so this package keeps knowing
 // nothing about sockets, and so a test can watch what was published.
 type LivePublisher interface {
-	PublishLive(userID string, s livestate.State)
+	PublishLive(ctx context.Context, userID string, s livestate.State)
 }
 
 // SetLivePublisher wires the hub in. Wiring time only, like SetActiveCheck:
@@ -148,13 +148,19 @@ func (s *Syncer) pollLive(ctx context.Context) {
 			continue
 		}
 		if live == nil {
-			s.publisher.PublishLive(p.UserID, livestate.State{Slug: liveSlug, Ended: true})
+			s.publisher.PublishLive(ctx, p.UserID, livestate.State{Slug: liveSlug, Ended: true})
 			continue
 		}
 		// Only facts about this member. Spectator also names the nine other
 		// participants, and none of them consented to being broadcast here.
-		s.publisher.PublishLive(p.UserID, livestate.State{
+		s.publisher.PublishLive(ctx, p.UserID, livestate.State{
 			Slug: liveSlug,
+			// This source is POLLED, once a minute by default, while the hub's
+			// default TTL is sized for a client sampling twice a second. Without
+			// saying so, a League game would be swept fifteen seconds after each
+			// poll and the card would blink on and off. liveTTL is this package's
+			// own trust window for a Spectator answer, so it is the honest one.
+			TTL: liveTTL,
 			Match: map[string]any{
 				"champion_name": live.ChampionName,
 				"champion_icon": live.ChampionIcon,

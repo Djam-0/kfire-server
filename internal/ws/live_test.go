@@ -1,6 +1,7 @@
 package ws
 
 import (
+	"context"
 	"fmt"
 	"sync"
 	"testing"
@@ -171,7 +172,7 @@ func TestLiveVisibilityConcurrentAccess(t *testing.T) {
 func TestPublishLiveRespecteLInvisibilite(t *testing.T) {
 	h := NewHub([]byte("secret"), nil, "", nil, nil)
 	h.SetVisibility("membre", false, "online")
-	h.PublishLive("membre", livestate.State{
+	h.PublishLive(context.Background(), "membre", livestate.State{
 		Slug:  "league-of-legends",
 		Match: map[string]any{"champion": "Ahri"},
 	})
@@ -183,15 +184,38 @@ func TestPublishLiveRespecteLInvisibilite(t *testing.T) {
 func TestPublishLiveStockeEtEfface(t *testing.T) {
 	h := NewHub([]byte("secret"), nil, "", nil, nil)
 	h.SetVisibility("membre", true, "online")
-	h.PublishLive("membre", livestate.State{
+	h.PublishLive(context.Background(), "membre", livestate.State{
 		Slug:  "league-of-legends",
 		Match: map[string]any{"champion": "Ahri"},
 	})
 	if h.LiveMatch("membre") == nil {
 		t.Fatal("l'état publié doit être visible")
 	}
-	h.PublishLive("membre", livestate.State{Slug: "league-of-legends", Ended: true})
+	h.PublishLive(context.Background(), "membre", livestate.State{Slug: "league-of-legends", Ended: true})
 	if h.LiveMatch("membre") != nil {
 		t.Fatal("la fin doit effacer l'état")
+	}
+}
+
+// Une source lente doit pouvoir dire elle-même combien de temps son état reste
+// valable. Sans ça, le poller LoL (une minute) se ferait balayer par un défaut
+// calibré pour un client qui émet deux fois par seconde, et sa carte
+// clignoterait au lieu de rester affichée.
+func TestExpiredUtiliseLaDureeDeLaSource(t *testing.T) {
+	now := time.Now()
+	slow := liveEntry{updatedAt: now.Add(-30 * time.Second), ttl: 3 * time.Minute}
+	if slow.expired(now) {
+		t.Fatal("une source qui annonce trois minutes ne doit pas expirer en trente secondes")
+	}
+	if !(liveEntry{updatedAt: now.Add(-4 * time.Minute), ttl: 3 * time.Minute}).expired(now) {
+		t.Fatal("elle doit tout de même expirer passé sa propre durée")
+	}
+	// Zéro veut dire « le défaut », pas « expire immédiatement » : c'est le cas
+	// de Rocket League, qui ne déclare rien.
+	if (liveEntry{updatedAt: now.Add(-5 * time.Second)}).expired(now) {
+		t.Fatal("une durée nulle doit retomber sur le défaut, pas expirer aussitôt")
+	}
+	if !(liveEntry{updatedAt: now.Add(-30 * time.Second)}).expired(now) {
+		t.Fatal("le défaut doit toujours expirer au-delà de liveTTL")
 	}
 }
