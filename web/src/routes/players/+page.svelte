@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { presence } from '$lib/stores/presence.svelte';
 	import { liveMatches } from '$lib/stores/live.svelte';
+	import { rlLiveMatch } from '$lib/rocketleague';
 	import { formatClock } from '$lib/format';
 	import Avatar from '$lib/components/Avatar.svelte';
 	import StatusBadge from '$lib/components/StatusBadge.svelte';
@@ -32,6 +33,7 @@
 {:else}
 	<ul class="pd-card overflow-hidden">
 		{#each filtered as m (m.user_id)}
+			{@const lm = rlLiveMatch(liveMatches.get(m.user_id))}
 			<li class="border-b border-[var(--color-border)] last:border-b-0">
 				<a
 					href="/players/{m.user_id}"
@@ -46,8 +48,7 @@
 							>{m.game.name}</span
 						>
 					{/if}
-					{#if liveMatches.get(m.user_id)?.game_slug === 'rocket-league'}
-						{@const lm = liveMatches.get(m.user_id)!.match}
+					{#if lm}
 						<span
 							class="pd-cut-sm flex shrink-0 items-center gap-1.5 bg-[var(--color-online)]/15 px-2 py-0.5 font-display text-xs font-bold italic"
 						>

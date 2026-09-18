@@ -9,8 +9,11 @@
 
 import type { LiveMatch, LiveMatchUpdate } from '../ws';
 
-/** One member's live match, with the game it belongs to. */
+/** One member's live match, with the game it belongs to. `user_id` repeats the
+ * map key, so a consumer walking `list` still knows whose match it is (the
+ * live page needs it to put a name on a card). */
 export type LiveEntry = {
+	user_id: string;
 	game_slug: string;
 	match: LiveMatch;
 };
@@ -22,7 +25,11 @@ let entries = $state<Map<string, LiveEntry>>(new Map());
 function apply(update: LiveMatchUpdate): void {
 	if (update.match && update.game_slug) {
 		const next = new Map(entries);
-		next.set(update.user_id, { game_slug: update.game_slug, match: update.match });
+		next.set(update.user_id, {
+			user_id: update.user_id,
+			game_slug: update.game_slug,
+			match: update.match
+		});
 		entries = next;
 	} else {
 		remove(update.user_id);

@@ -90,6 +90,10 @@ export const en = {
 		rlLive: 'Live',
 		rlOvertime: 'OT'
 	},
+	live: {
+		heading: 'Live games',
+		empty: 'Nobody is playing right now.'
+	},
 	profile: {
 		loading: 'Loading...',
 		loadError: 'failed to load profile',

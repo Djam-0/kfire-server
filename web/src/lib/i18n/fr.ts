@@ -91,6 +91,10 @@ export const fr: Catalog = {
 		rlLive: 'En direct',
 		rlOvertime: 'Prol.'
 	},
+	live: {
+		heading: 'Jeux en live',
+		empty: 'Personne ne joue en ce moment.'
+	},
 	profile: {
 		loading: 'Chargement...',
 		loadError: 'impossible de charger le profil',

@@ -11,19 +11,14 @@ export type PresenceSocket = { close: () => void };
  * The state of a match in progress, broadcast twice a second while a member
  * plays and never persisted. `null` (delivered as the `match` field of a
  * `live_match` event) means that member's match just ended.
+ *
+ * The payload's shape depends on the game: Rocket League sends scores and a
+ * clock, Hearthstone will send turns, League of Legends a champion and a KDA.
+ * Only `game_slug` says which, and it is only known at runtime, so this type
+ * stays deliberately shapeless. Each game narrows it to its own type in one
+ * place, right after checking the slug (see `rlLiveMatch`).
  */
-export type LiveMatch = {
-	team_blue_score: number;
-	team_orange_score: number;
-	seconds_remaining: number;
-	overtime: boolean;
-	goals: number;
-	assists: number;
-	saves: number;
-	shots: number;
-	score: number;
-	demos: number;
-};
+export type LiveMatch = Record<string, unknown>;
 
 /**
  * A `live_match` event: one member's current match state, or its end.
