@@ -46,7 +46,16 @@
 	// instead of tearing one down and reopening it on each emission.
 	let socketUserId: string | null = null;
 
-	async function openSocket(userId: string) {
+	// Whether the socket has dropped since the last snapshot. A presence_update
+	// is only ever a delta, so everything that changed during an outage was
+	// missed: a member who went offline while we were disconnected would stay
+	// shown as online until his next action. Reloading the snapshot on the way
+	// back is what closes that gap. Missing it used to be hidden by every page
+	// reloading the snapshot on mount; with one session-long socket, nothing
+	// hides it any more.
+	let missedUpdates = false;
+
+	async function loadSnapshot(userId: string) {
 		try {
 			presence.hydrate(await api.getPresence());
 		} catch {
@@ -54,11 +63,32 @@
 			presence.hydrate([]);
 		}
 		// Auth may have changed while the snapshot was in flight.
-		if (socketUserId !== userId) return;
+		return socketUserId === userId;
+	}
+
+	function onSocketStatus(userId: string, status: 'connecting' | 'connected' | 'disconnected') {
+		presence.setStatus(status);
+		if (status === 'disconnected') {
+			missedUpdates = true;
+			// Live matches have no snapshot and no client-side expiry, so a state
+			// held here is only as good as the socket that feeds it. While it is
+			// down we cannot know a match ended, and a frozen score would sit on
+			// screen forever. Dropping them says "we don't know", which is true;
+			// the next sample refills within half a second of reconnecting.
+			liveMatches.clear();
+		} else if (status === 'connected' && missedUpdates) {
+			missedUpdates = false;
+			loadSnapshot(userId);
+		}
+	}
+
+	async function openSocket(userId: string) {
+		if (!(await loadSnapshot(userId))) return;
+		missedUpdates = false;
 		socket = connectPresence(
 			() => get(auth).accessToken,
 			(entry) => presence.apply(entry),
-			(status) => presence.setStatus(status),
+			(status) => onSocketStatus(userId, status),
 			(update) => liveMatches.apply(update)
 		);
 	}
