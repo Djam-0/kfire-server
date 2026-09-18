@@ -534,7 +534,7 @@ func (c *client) handleLiveMatch(h *Hub, env Envelope) {
 		// reporting the end of a game the hub is not showing has nothing to
 		// take off anyone's screen, and broadcasting it would take down the
 		// card of the game that IS in progress.
-		if h.clearLive(c.userID, s.Slug) {
+		if h.clearLive(c.userID, s.Slug, sourceClient) {
 			h.Broadcast("live_match", map[string]any{"user_id": c.userID, "match": nil})
 		}
 		return
@@ -547,15 +547,52 @@ func (c *client) handleLiveMatch(h *Hub, env Envelope) {
 		return
 	}
 
-	h.setLive(c.userID, s)
-	h.Broadcast("live_match", h.liveJSON(c.userID))
+	if h.setLive(c.userID, s, sourceClient) {
+		h.Broadcast("live_match", h.liveJSON(c.userID))
+	}
 }
 
-// setLive stores a member's match state.
-func (h *Hub) setLive(userID string, s livestate.State) {
+// setLive stores a member's match state, and says whether it was stored.
+//
+// THE RULE: a state pulled by the server does not replace a state pushed by a
+// client that is still fresh. The other way round is unconditional, a client
+// state always wins.
+//
+// It exists because one game, League of Legends, now has both: a poller that
+// asks Riot's Spectator API once a minute for the champion and the mode, and
+// the member's own machine pushing the level, the KDA, the creeps and the gold
+// several times a second. Without the rule the poller would overwrite the rich
+// state every minute and the card would lose its KDA one second in sixty.
+// Sorting it by richness or by rhythm would have meant this package knowing
+// what each game reports; the source is the fact it can know.
+//
+// Scoped to the same slug, so a member holding a Hearthstone state pushed by
+// their client does not become unreachable to a League state pulled for them:
+// one member holds one entry, and cross-game arbitration is still last writer
+// wins, exactly as before.
+//
+// Returning false rather than staying silent lets the caller skip a broadcast
+// that would announce a change that did not happen.
+func (h *Hub) setLive(userID string, s livestate.State, src liveSource) bool {
 	h.mu.Lock()
 	defer h.mu.Unlock()
-	h.live[userID] = liveEntry{slug: s.Slug, match: s.Match, updatedAt: time.Now(), ttl: s.TTL}
+	if src == sourceServer && h.heldByFreshClient(userID, s.Slug) {
+		return false
+	}
+	h.live[userID] = liveEntry{slug: s.Slug, match: s.Match, updatedAt: time.Now(), source: src, ttl: s.TTL}
+	return true
+}
+
+// heldByFreshClient reports whether this member's entry for this game came from
+// their own client and is still within its TTL. Callers hold h.mu.
+//
+// Freshness is what makes the rule safe rather than a trap: a client that stops
+// pushing, crashes or is simply too old to know this game stops protecting the
+// entry as soon as its TTL runs out, and the server takes over. That is what
+// keeps Spectator working on its own for everyone else.
+func (h *Hub) heldByFreshClient(userID, slug string) bool {
+	e, had := h.live[userID]
+	return had && e.source == sourceClient && e.slug == slug && !e.expired(time.Now())
 }
 
 // clearLive forgets a member's live match for one game, and says whether there
@@ -570,9 +607,17 @@ func (h *Hub) setLive(userID string, s livestate.State) {
 // announced by whichever game finished. Without this check, a member playing
 // Hearthstone and Rocket League at once would see one game's ending wipe the
 // other's card off the whole guild's screens.
-func (h *Hub) clearLive(userID, slug string) bool {
+func (h *Hub) clearLive(userID, slug string, src liveSource) bool {
 	h.mu.Lock()
 	defer h.mu.Unlock()
+	// An end pulled by the server is the same overwrite as any other, by the
+	// shortest path, so it obeys the same rule: Spectator answers 404 for a
+	// game it has merely lost sight of, while a client still pushing is proof
+	// the game is running. Only the member's own machine, or the sweep once the
+	// entry has gone stale, takes that card down.
+	if src == sourceServer && h.heldByFreshClient(userID, slug) {
+		return false
+	}
 	e, had := h.live[userID]
 	if !had || e.slug != slug {
 		return false
@@ -769,7 +814,7 @@ func (c *client) closeWithError(closeCode int, code, message string) {
 // so there is nothing to validate that the compiler has not already checked.
 func (h *Hub) PublishLive(ctx context.Context, userID string, s livestate.State) {
 	if s.Ended {
-		if h.clearLive(userID, s.Slug) {
+		if h.clearLive(userID, s.Slug, sourceServer) {
 			h.Broadcast("live_match", h.liveJSON(userID))
 		}
 		return
@@ -777,6 +822,7 @@ func (h *Hub) PublishLive(ctx context.Context, userID string, s livestate.State)
 	if !h.liveAllowedOrLoad(ctx, userID) {
 		return
 	}
-	h.setLive(userID, s)
-	h.Broadcast("live_match", h.liveJSON(userID))
+	if h.setLive(userID, s, sourceServer) {
+		h.Broadcast("live_match", h.liveJSON(userID))
+	}
 }

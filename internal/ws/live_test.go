@@ -35,7 +35,7 @@ func TestLiveSharedState(t *testing.T) {
 			"seconds_remaining": 143, "goals": 1, "saves": 2, "shots": 3, "score": 310,
 		},
 	}
-	h.setLive("u1", s)
+	h.setLive("u1", s, sourceClient)
 
 	got := h.LiveMatch("u1")
 	if got == nil {
@@ -55,13 +55,13 @@ func TestLiveSharedState(t *testing.T) {
 
 	// La fin de partie efface l'état : c'est ce qui fait disparaître la carte
 	// du portail, donc c'est du comportement, pas un détail interne.
-	if !h.clearLive("u1", "rocket-league") {
+	if !h.clearLive("u1", "rocket-league", sourceClient) {
 		t.Error("clearLive devait signaler qu'il y avait un match en cours")
 	}
 	if h.LiveMatch("u1") != nil {
 		t.Error("l'état survit à la fin du match")
 	}
-	if h.clearLive("u1", "rocket-league") {
+	if h.clearLive("u1", "rocket-league", sourceClient) {
 		t.Error("clearLive sur un membre sans match doit rendre false")
 	}
 }
@@ -79,7 +79,7 @@ func TestLiveConcurrentAccess(t *testing.T) {
 		go func() {
 			defer wg.Done()
 			for j := 0; j < 200; j++ {
-				h.setLive(member, livestate.State{Slug: "rocket-league", Match: map[string]any{"team_blue_score": j % 5}})
+				h.setLive(member, livestate.State{Slug: "rocket-league", Match: map[string]any{"team_blue_score": j % 5}}, sourceClient)
 			}
 		}()
 		go func() {
@@ -97,8 +97,8 @@ func TestSweepForgetsAMatchThatWentQuiet(t *testing.T) {
 	// ferme pas, donc unregister ne passe jamais. Sans le balayage, sa carte
 	// resterait figée à l'écran de toute la guilde.
 	h := NewHub(nil, nil, "", nil, nil)
-	h.setLive("frais", livestate.State{Slug: "rocket-league", Match: map[string]any{"x": 1}})
-	h.setLive("perdu", livestate.State{Slug: "rocket-league", Match: map[string]any{"x": 2}})
+	h.setLive("frais", livestate.State{Slug: "rocket-league", Match: map[string]any{"x": 1}}, sourceClient)
+	h.setLive("perdu", livestate.State{Slug: "rocket-league", Match: map[string]any{"x": 2}}, sourceClient)
 
 	h.mu.Lock()
 	e := h.live["perdu"]
@@ -124,7 +124,7 @@ func TestLiveVisibilityCutsTheStream(t *testing.T) {
 	if !h.liveAllowed("u1") {
 		t.Fatal("a visible member must be able to broadcast")
 	}
-	h.setLive("u1", livestate.State{Slug: "rocket-league", Match: map[string]any{"team_blue_score": 1}})
+	h.setLive("u1", livestate.State{Slug: "rocket-league", Match: map[string]any{"team_blue_score": 1}}, sourceClient)
 
 	// They go hidden mid-match.
 	h.SetVisibility("u1", true, "invisible")
@@ -161,7 +161,7 @@ func TestLiveVisibilityConcurrentAccess(t *testing.T) {
 			defer wg.Done()
 			for j := 0; j < 300; j++ {
 				if h.liveAllowed("u1") {
-					h.setLive("u1", livestate.State{Slug: "rocket-league"})
+					h.setLive("u1", livestate.State{Slug: "rocket-league"}, sourceClient)
 				}
 			}
 		}()
@@ -228,10 +228,13 @@ func TestExpiredUtiliseLaDureeDeLaSource(t *testing.T) {
 func TestUneFinNEffaceQueSonPropreJeu(t *testing.T) {
 	h := NewHub([]byte("secret"), nil, "", nil, nil)
 	h.SetVisibility("membre", true, "online")
+	// Source serveur, parce que ce test parle du slug et de rien d'autre :
+	// une fin publiée par le serveur ne peut pas effacer un état poussé par un
+	// client encore frais, et ce n'est pas la règle qu'on vérifie ici.
 	h.setLive("membre", livestate.State{
 		Slug:  "rocket-league",
 		Match: map[string]any{"team_blue_score": 2},
-	})
+	}, sourceServer)
 
 	h.PublishLive(context.Background(), "membre", livestate.State{Slug: "hearthstone", Ended: true})
 	if h.LiveMatch("membre") == nil {
@@ -249,21 +252,144 @@ func TestUneFinNEffaceQueSonPropreJeu(t *testing.T) {
 // directement, parce que handleLiveMatch passe par le même point.
 func TestClearLiveNEffaceQueLeJeuNomme(t *testing.T) {
 	h := NewHub(nil, nil, "", nil, nil)
-	h.setLive("membre", livestate.State{Slug: "rocket-league", Match: map[string]any{"x": 1}})
+	h.setLive("membre", livestate.State{Slug: "rocket-league", Match: map[string]any{"x": 1}}, sourceClient)
 
-	if h.clearLive("membre", "hearthstone") {
+	if h.clearLive("membre", "hearthstone", sourceClient) {
 		t.Error("clearLive a prétendu effacer un état qui n'est pas celui du jeu nommé")
 	}
 	if h.LiveMatch("membre") == nil {
 		t.Error("l'état d'un autre jeu doit survivre")
 	}
-	if !h.clearLive("membre", "rocket-league") {
+	if !h.clearLive("membre", "rocket-league", sourceClient) {
 		t.Error("clearLive devait signaler qu'il y avait un match en cours")
 	}
 	if h.LiveMatch("membre") != nil {
 		t.Error("l'état survit à la fin du match")
 	}
-	if h.clearLive("membre", "rocket-league") {
+	if h.clearLive("membre", "rocket-league", sourceClient) {
 		t.Error("clearLive sur un membre sans match doit rendre false")
 	}
+}
+
+// League of Legends est désormais rapporté par DEUX sources pour le même
+// membre et le même jeu : le client pousse l'état riche de l'API locale
+// plusieurs fois par seconde, le poller Spectator tire un état pauvre une fois
+// par minute. Sans règle, le poller écraserait périodiquement l'état riche et
+// la carte perdrait son KDA une seconde sur soixante.
+func TestUnEtatServeurNEcrasePasUnEtatClientFrais(t *testing.T) {
+	h := NewHub([]byte("secret"), nil, "", nil, nil)
+	h.SetVisibility("membre", true, "online")
+
+	h.setLive("membre", livestate.State{
+		Slug:  "league-of-legends",
+		Match: map[string]any{"champion": "Ahri", "kills": 7, "gold": 8350},
+	}, sourceClient)
+
+	h.PublishLive(context.Background(), "membre", livestate.State{
+		Slug:  "league-of-legends",
+		Match: map[string]any{"champion_name": "Ahri", "mode": "CLASSIC"},
+		TTL:   3 * time.Minute,
+	})
+
+	got := h.LiveMatch("membre")
+	if got == nil {
+		t.Fatal("l'état du membre a disparu")
+	}
+	if got["kills"] != 7 {
+		t.Fatalf("l'état riche du client a été écrasé par celui du serveur : %v", got)
+	}
+}
+
+// La fin annoncée par le serveur est le même écrasement par un autre chemin :
+// Spectator peut répondre 404 en pleine partie, et le client qui pousse
+// toujours prouve que la partie continue.
+func TestUneFinServeurNEffacePasUnEtatClientFrais(t *testing.T) {
+	h := NewHub([]byte("secret"), nil, "", nil, nil)
+	h.SetVisibility("membre", true, "online")
+	h.setLive("membre", livestate.State{
+		Slug:  "league-of-legends",
+		Match: map[string]any{"champion": "Ahri", "kills": 7},
+	}, sourceClient)
+
+	h.PublishLive(context.Background(), "membre", livestate.State{Slug: "league-of-legends", Ended: true})
+	if h.LiveMatch("membre") == nil {
+		t.Fatal("une fin tirée par le serveur a effacé l'état poussé par le client")
+	}
+}
+
+// L'inverse doit rester vrai, sinon la couverture qui justifie Spectator est
+// perdue : dès que le client se tait assez longtemps, le serveur reprend la
+// main.
+func TestLeServeurReprendLaMainApresExpirationDuClient(t *testing.T) {
+	h := NewHub([]byte("secret"), nil, "", nil, nil)
+	h.SetVisibility("membre", true, "online")
+	h.setLive("membre", livestate.State{
+		Slug:  "league-of-legends",
+		Match: map[string]any{"champion": "Ahri", "kills": 7},
+	}, sourceClient)
+	ageLiveEntry(h, "membre", liveTTL+time.Second)
+
+	h.PublishLive(context.Background(), "membre", livestate.State{
+		Slug:  "league-of-legends",
+		Match: map[string]any{"champion_name": "Ahri", "mode": "CLASSIC"},
+		TTL:   3 * time.Minute,
+	})
+
+	got := h.LiveMatch("membre")
+	if got == nil {
+		t.Fatal("le serveur n'a pas repris la main sur un état client périmé")
+	}
+	if _, rich := got["kills"]; rich {
+		t.Fatalf("l'état client périmé est resté en place : %v", got)
+	}
+}
+
+// Un état client remplace toujours un état serveur, quel que soit son âge :
+// c'est la source la plus riche et la plus fraîche des deux.
+func TestUnEtatClientRemplaceToujoursUnEtatServeur(t *testing.T) {
+	h := NewHub([]byte("secret"), nil, "", nil, nil)
+	h.SetVisibility("membre", true, "online")
+	h.PublishLive(context.Background(), "membre", livestate.State{
+		Slug:  "league-of-legends",
+		Match: map[string]any{"champion_name": "Ahri", "mode": "CLASSIC"},
+		TTL:   3 * time.Minute,
+	})
+
+	h.setLive("membre", livestate.State{
+		Slug:  "league-of-legends",
+		Match: map[string]any{"champion": "Ahri", "kills": 7},
+	}, sourceClient)
+
+	got := h.LiveMatch("membre")
+	if got == nil || got["kills"] != 7 {
+		t.Fatalf("l'état client doit remplacer celui du serveur : %v", got)
+	}
+}
+
+// Spectator seul doit continuer de fonctionner, pour le membre qui n'a pas de
+// client KFIRE à jour : c'est cette couverture qui justifie la source.
+func TestSpectatorSeulSeSuccedeAluiMeme(t *testing.T) {
+	h := NewHub([]byte("secret"), nil, "", nil, nil)
+	h.SetVisibility("membre", true, "online")
+	for _, mode := range []string{"CLASSIC", "ARAM"} {
+		h.PublishLive(context.Background(), "membre", livestate.State{
+			Slug:  "league-of-legends",
+			Match: map[string]any{"champion_name": "Ahri", "mode": mode},
+			TTL:   3 * time.Minute,
+		})
+	}
+	got := h.LiveMatch("membre")
+	if got == nil || got["mode"] != "ARAM" {
+		t.Fatalf("un poll serveur doit succéder au précédent : %v", got)
+	}
+}
+
+// ageLiveEntry vieillit artificiellement l'entrée d'un membre, pour ne pas
+// faire attendre le test pendant toute la durée du TTL.
+func ageLiveEntry(h *Hub, userID string, by time.Duration) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	e := h.live[userID]
+	e.updatedAt = e.updatedAt.Add(-by)
+	h.live[userID] = e
 }
