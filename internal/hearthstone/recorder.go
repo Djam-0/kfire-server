@@ -46,7 +46,7 @@ func (p payload) valid() bool {
 	if p.PlayedAt.IsZero() {
 		return false
 	}
-	if p.Mode != "battlegrounds" && p.Mode != "constructed" {
+	if p.Mode != modeBattlegrounds && p.Mode != modeConstructed {
 		return false
 	}
 	if p.Result != "win" && p.Result != "loss" && p.Result != "draw" {
@@ -79,7 +79,7 @@ type Recorder struct {
 func NewRecorder(st *store.Store) *Recorder { return &Recorder{st: st} }
 
 // Slug returns the claimed catalog slug.
-func (r *Recorder) Slug() string { return "hearthstone" }
+func (r *Recorder) Slug() string { return SLUG }
 
 // Record validates then writes a match.
 //

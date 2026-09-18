@@ -17,9 +17,9 @@ type Plugin struct {
 // New builds the plugin.
 func New(st *store.Store) *Plugin { return &Plugin{st: st} }
 
-func (p *Plugin) ID() string      { return "hearthstone" }
+func (p *Plugin) ID() string      { return SLUG }
 func (p *Plugin) Name() string    { return "Hearthstone" }
-func (p *Plugin) Slugs() []string { return []string{"hearthstone"} }
+func (p *Plugin) Slugs() []string { return []string{SLUG} }
 
 // Connector returns an empty string: Hearthstone has no credential layer.
 func (p *Plugin) Connector() string { return "" }

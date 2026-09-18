@@ -90,6 +90,7 @@ func main() {
 	)
 	live := livestate.NewRegistry(
 		rocketleague.NewLiveReporter(),
+		hearthstone.NewLiveReporter(),
 	)
 	hub := ws.NewHub([]byte(cfg.JWTSecret), st, cfg.PublicURL, recorders, live)
 
