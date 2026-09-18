@@ -34,6 +34,12 @@ func TestPayloadValidation(t *testing.T) {
 		{"defaite orange", body(`"playlist":11,"team_size":2,"player_team":1,"team_blue_score":5,"team_orange_score":1,"result":"loss","goals":0,"assists":0,"saves":1,"shots":2,"score":180,"demos":0,"mvp":false,"duration_seconds":300`), true},
 		{"victoire orange", body(`"playlist":13,"team_size":3,"player_team":1,"team_blue_score":2,"team_orange_score":5,"result":"win","goals":3,"assists":1,"saves":0,"shots":4,"score":520,"demos":2,"mvp":true,"duration_seconds":345`), true},
 		{"match nul", body(`"playlist":6,"team_size":3,"player_team":0,"team_blue_score":2,"team_orange_score":2,"result":"draw","goals":1,"assists":0,"saves":0,"shots":3,"score":250,"demos":0,"mvp":false,"duration_seconds":300`), true},
+		// Le fantôme remonté le 2026-09-18 : le jeu continue d'envoyer des
+		// trames sur l'écran de fin de partie, le client en fabrique un match
+		// dont le chronomètre démarre à la fin du vrai match. Aucune partie de
+		// Rocket League ne dure trente secondes, même abandonnée.
+		{"duree de fantome", body(`"playlist":11,"team_size":2,"player_team":1,"team_blue_score":2,"team_orange_score":1,"result":"loss","goals":1,"assists":0,"saves":2,"shots":3,"score":210,"demos":0,"mvp":false,"duration_seconds":30`), false},
+		{"duree tout juste plausible", body(`"playlist":11,"team_size":2,"player_team":1,"team_blue_score":2,"team_orange_score":1,"result":"loss","goals":1,"assists":0,"saves":2,"shots":3,"score":210,"demos":0,"mvp":false,"duration_seconds":60`), true},
 
 		// The real protocol has no playlist field at all: a payload that
 		// omits it entirely must still be accepted.
