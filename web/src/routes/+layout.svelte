@@ -120,6 +120,7 @@
 		{ href: '/leaderboards', label: t('nav.leaderboards') },
 		{ href: '/games', label: t('nav.games') },
 		{ href: '/live', label: t('nav.live'), live: true },
+		{ href: '/recap', label: t('nav.recap') },
 		{ href: '/download', label: t('nav.download') },
 		...($auth.user?.role === 'admin' ? [{ href: '/admin', label: t('nav.admin') }] : []),
 		{ href: '/account', label: t('nav.account') }

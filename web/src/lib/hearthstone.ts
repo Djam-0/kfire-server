@@ -1,6 +1,25 @@
 import type { HsProfile, HsProfileHero, HsRecentMatch, HsPlayer } from './api';
-import { getLocale } from './i18n';
+import { getLocale, t } from './i18n';
 import heroes from './hs-heroes.json';
+
+/** The slug the server uses for Hearthstone on recaps and presence. */
+export const HS_SLUG = 'hearthstone';
+
+/** Mode labels the catalog knows; anything else shows the raw mode name. */
+const HS_MODE_KEYS: Record<string, string> = {
+	battlegrounds: 'game.hsModeBattlegrounds',
+	constructed: 'game.hsModeConstructed',
+	arena: 'game.hsModeArena'
+};
+
+/**
+ * The mode's label in the reader's language. An unknown mode falls back to its
+ * raw name, which degrades one label instead of hiding the match.
+ */
+export function hsModeLabel(mode: string): string {
+	const key = HS_MODE_KEYS[mode];
+	return key ? t(key) : mode;
+}
 
 /**
  * Win rate across every reported match, as a whole percentage.

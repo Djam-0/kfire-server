@@ -5,7 +5,14 @@
 	import { formatDate, formatDuration, timeAgo } from '$lib/format';
 	import { t } from '$lib/i18n';
 	import { wowClassColor, wowClassIcon, wowVersionGroups, wowVersionIcon, wowVersionName } from '$lib/wow';
-	import { heroArt, heroName, hsHeroRate, hsPlacementBars, hsTrend } from '$lib/hearthstone';
+	import {
+		heroArt,
+		heroName,
+		hsHeroRate,
+		hsModeLabel,
+		hsPlacementBars,
+		hsTrend
+	} from '$lib/hearthstone';
 	import { rlModeLabel, rlSideScore } from '$lib/rocketleague';
 
 	let detail = $state<PlayerGameDetail | null>(null);
@@ -105,18 +112,6 @@
 	function lolChampName(name: string | undefined, id?: number): string {
 		if (name && name.trim()) return name;
 		return id !== undefined ? `#${id}` : '?';
-	}
-
-	/** Mode labels the catalog knows; anything else shows the raw mode name. */
-	const HS_MODE_KEYS: Record<string, string> = {
-		battlegrounds: 'game.hsModeBattlegrounds',
-		constructed: 'game.hsModeConstructed',
-		arena: 'game.hsModeArena'
-	};
-
-	function hsModeLabel(mode: string): string {
-		const key = HS_MODE_KEYS[mode];
-		return key ? t(key) : mode;
 	}
 
 	/** Short day-and-month stamp for a match, in the reader's locale. */

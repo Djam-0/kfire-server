@@ -242,6 +242,116 @@ export type RlMatch = {
 	played_at: string;
 };
 
+/**
+ * The member a recap row CAME FROM, and nothing else.
+ *
+ * There is deliberately no second player anywhere in a recap: the match tables
+ * carry no column able to hold one, so no teammate and no opponent ever leaves
+ * a member's machine. Two members having a match on the same minute is a
+ * coincidence, never evidence they played together, and pairing them here
+ * would turn a guess into a displayed fact.
+ */
+export type RecapMember = {
+	user_id: string;
+	username: string;
+	/** Absent when the member has no avatar. */
+	avatar_url?: string;
+};
+
+/** One member's Rocket League record over the window. */
+export type RecapRlMember = RecapMember & {
+	matches: number;
+	wins: number;
+	losses: number;
+	draws: number;
+	mvps: number;
+	goals: number;
+	assists: number;
+	saves: number;
+	shots: number;
+	demos: number;
+	score: number;
+	play_time_seconds: number;
+};
+
+/**
+ * One member's Hearthstone record over the window. Nothing is shared with the
+ * Rocket League record on purpose: one counts goals, the other a finishing
+ * position.
+ */
+export type RecapHsMember = RecapMember & {
+	matches: number;
+	wins: number;
+	losses: number;
+	draws: number;
+	/** Matches carrying a placement, i.e. Battlegrounds ones. */
+	ranked: number;
+	top4: number;
+	/** Null, not absent, and null rather than zero when `ranked` is 0. */
+	avg_placement: number | null;
+};
+
+/**
+ * One game's part of the summary. `members` holds rows whose shape depends on
+ * `game_slug`, so it is typed as the common head and narrowed at the point of
+ * use, the same way a live payload is (see `rlLiveMatch`).
+ */
+export type RecapGameBlock = {
+	game_id: string;
+	game_slug: string;
+	game_name: string;
+	matches: number;
+	members: RecapMember[];
+};
+
+/** What every timeline entry carries, whatever the game. */
+export type RecapEntry = RecapMember & {
+	played_at: string;
+	game_id: string;
+	game_slug: string;
+	game_name: string;
+};
+
+/** A Rocket League timeline entry. Unlike a live sample, it has team_size. */
+export type RecapRlEntry = RecapEntry & {
+	result: 'win' | 'loss' | 'draw';
+	/** Null, not absent; an internal Psyonix identifier, never rendered. */
+	playlist: number | null;
+	team_size: number;
+	/** 0 (blue) or 1 (orange): which side the member played. */
+	player_team: number;
+	team_blue_score: number;
+	team_orange_score: number;
+	goals: number;
+	assists: number;
+	saves: number;
+	shots: number;
+	score: number;
+	demos: number;
+	mvp: boolean;
+	duration_seconds: number;
+};
+
+/** A Hearthstone timeline entry. The nullable fields are present as null. */
+export type RecapHsEntry = RecapEntry & {
+	mode: string;
+	result: 'win' | 'loss' | 'draw';
+	turns: number | null;
+	/** Null outside Battlegrounds: a constructed game has no placement. */
+	placement: number | null;
+	hero_card_id: string | null;
+};
+
+/** The whole evening in one payload: the summary and the single timeline. */
+export type Recap = {
+	from: string;
+	to: string;
+	total_matches: number;
+	games: RecapGameBlock[];
+	/** Already oldest first, all games merged. */
+	timeline: RecapEntry[];
+};
+
 export type GameDetail = {
 	game: Game;
 	total_seconds: number;
@@ -760,6 +870,22 @@ export const api = {
 
 	async syncCatalog(): Promise<{ upserted: number }> {
 		return json(await authFetch('/api/v1/admin/games/sync', { method: 'POST' }));
+	},
+
+	/**
+	 * The guild's recap over one range. Both bounds are RFC 3339 instants, so
+	 * the window means the same thing whatever time zone the reader is in.
+	 *
+	 * A refused range answers 400 with a sentence saying precisely what is
+	 * wrong; `json` turns it into an ApiError carrying that sentence, and the
+	 * page shows it rather than a generic message.
+	 */
+	async getRecap(from: string, to: string): Promise<Recap> {
+		return json(
+			await authFetch(
+				`/api/v1/recap?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`
+			)
+		);
 	}
 };
 

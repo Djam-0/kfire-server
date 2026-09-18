@@ -26,6 +26,19 @@ const clockSkewTolerance = 5 * time.Minute
 // re-emits it forever.
 const maxDuration = 7200
 
+// minDuration rejects a match too short to have been played.
+//
+// A Rocket League match lasts five minutes, and even a forfeit cannot end in
+// under a minute. Anything shorter is not a game: it is the phantom the
+// desktop client builds out of the frames the game keeps sending on the
+// post-match screen, whose stopwatch starts at the end of the real match.
+//
+// Refusing it here is what keeps those out of members' averages without
+// waiting for every client to be updated. It follows the rule this whole
+// feature is built on: report nothing rather than report something invented,
+// because a wrong figure is indistinguishable from a right one once stored.
+const minDuration = 60
+
 // trainingPlaylists are the Psyonix identifiers the client must never
 // report: free play, workshop maps and training. They have no opponent and
 // would skew every ratio.
@@ -129,7 +142,7 @@ func (p payload) valid() bool {
 		p.Shots < 0 || p.Score < 0 || p.Demos < 0 {
 		return false
 	}
-	if p.DurationSeconds < 0 || p.DurationSeconds > maxDuration {
+	if p.DurationSeconds < minDuration || p.DurationSeconds > maxDuration {
 		return false
 	}
 	// The announced result must match the scores: a client does not declare
