@@ -23,6 +23,7 @@ import (
 	"github.com/knightsofeternity/kfire-server/internal/hearthstone"
 	"github.com/knightsofeternity/kfire-server/internal/livestate"
 	"github.com/knightsofeternity/kfire-server/internal/matchrecord"
+	"github.com/knightsofeternity/kfire-server/internal/riotsync"
 	"github.com/knightsofeternity/kfire-server/internal/rocketleague"
 	"github.com/knightsofeternity/kfire-server/internal/steamsync"
 	"github.com/knightsofeternity/kfire-server/internal/store"
@@ -91,6 +92,7 @@ func main() {
 	live := livestate.NewRegistry(
 		rocketleague.NewLiveReporter(),
 		hearthstone.NewLiveReporter(),
+		riotsync.NewLiveReporter(),
 	)
 	hub := ws.NewHub([]byte(cfg.JWTSecret), st, cfg.PublicURL, recorders, live)
 
