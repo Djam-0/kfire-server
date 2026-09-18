@@ -95,7 +95,11 @@ export const fr: Catalog = {
 	live: {
 		heading: 'Jeux en live',
 		empty: 'Personne ne joue en ce moment.',
-		unknownMember: 'Un membre'
+		unknownMember: 'Un membre',
+		unknownChampion: 'Champion inconnu',
+		badge: 'En direct',
+		mode: 'Mode',
+		elapsed: 'Temps écoulé'
 	},
 	recap: {
 		title: 'Bilan de session',

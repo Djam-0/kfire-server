@@ -94,7 +94,11 @@ export const en = {
 	live: {
 		heading: 'Live games',
 		empty: 'Nobody is playing right now.',
-		unknownMember: 'A member'
+		unknownMember: 'A member',
+		unknownChampion: 'Unknown champion',
+		badge: 'Live',
+		mode: 'Mode',
+		elapsed: 'Elapsed'
 	},
 	recap: {
 		title: 'Session recap',
