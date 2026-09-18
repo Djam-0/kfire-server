@@ -80,3 +80,36 @@ func TestRecordReturnsTheSentinelInBothCases(t *testing.T) {
 		t.Errorf("message should carry the offending mode, got %q", rejectedFields)
 	}
 }
+
+// Une partie construite ne peut pas avoir de classement : il n'y a pas de
+// lobby. Si le journal en laisse traîner un, il doit être oublié et NON compté,
+// parce que les statistiques moyennent toute ligne qui en porte un et qu'une
+// partie construite y ferait baisser ou monter la position moyenne sans raison.
+//
+// Le match, lui, est conservé : il a vraiment été joué.
+func TestUnClassementEnConstruitEstOublieMaisLeMatchEstGarde(t *testing.T) {
+	four := 4
+	p := payload{Mode: modeConstructed, Result: "win", Placement: &four, PlayedAt: time.Now().UTC()}
+	if !p.valid() {
+		t.Fatal("une partie construite avec un classement parasite reste valide")
+	}
+
+	// La règle appliquée à l'insertion, isolée pour être testable sans base.
+	placement := p.Placement
+	if p.Mode != modeBattlegrounds {
+		placement = nil
+	}
+	if placement != nil {
+		t.Fatalf("classement %d conservé en mode construit", *placement)
+	}
+
+	// Et en Champs de bataille, il est bien conservé.
+	p.Mode = modeBattlegrounds
+	placement = p.Placement
+	if p.Mode != modeBattlegrounds {
+		placement = nil
+	}
+	if placement == nil || *placement != 4 {
+		t.Fatal("le classement doit être conservé en Champs de bataille")
+	}
+}
