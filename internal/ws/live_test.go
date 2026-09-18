@@ -52,12 +52,16 @@ func TestLiveSharedState(t *testing.T) {
 		t.Error("LiveMatch returns a state for a member who is not playing")
 	}
 
-	// The end of a match clears it.
-	h.mu.Lock()
-	delete(h.live, "u1")
-	h.mu.Unlock()
+	// La fin de partie efface l'état : c'est ce qui fait disparaître la carte
+	// du portail, donc c'est du comportement, pas un détail interne.
+	if !h.clearLive("u1") {
+		t.Error("clearLive devait signaler qu'il y avait un match en cours")
+	}
 	if h.LiveMatch("u1") != nil {
-		t.Error("the state survives the end of the match")
+		t.Error("l'état survit à la fin du match")
+	}
+	if h.clearLive("u1") {
+		t.Error("clearLive sur un membre sans match doit rendre false")
 	}
 }
 

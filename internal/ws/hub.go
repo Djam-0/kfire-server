@@ -530,9 +530,7 @@ func (c *client) handleLiveMatch(h *Hub, env Envelope) {
 	}
 
 	if s.Ended {
-		h.mu.Lock()
-		delete(h.live, c.userID)
-		h.mu.Unlock()
+		h.clearLive(c.userID)
 		h.Broadcast("live_match", map[string]any{"user_id": c.userID, "match": nil})
 		return
 	}
@@ -553,6 +551,19 @@ func (h *Hub) setLive(userID string, s livestate.State) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	h.live[userID] = liveEntry{slug: s.Slug, match: s.Match, updatedAt: time.Now()}
+}
+
+// clearLive forgets a member's live match and says whether there was one.
+//
+// Named rather than inlined in the handler so the end of a match is a thing the
+// hub does, and a thing a test can call. Ending is the visible half of the
+// feature: it is what makes a card disappear from the portal.
+func (h *Hub) clearLive(userID string) bool {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	_, had := h.live[userID]
+	delete(h.live, userID)
+	return had
 }
 
 // setLiveVisible stores what a member allows for their live match.
