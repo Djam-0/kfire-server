@@ -28,6 +28,8 @@ type Syncer struct {
 	dd     *riot.DataDragon
 	live   *liveRegistry
 	active func() bool
+
+	publisher LivePublisher
 }
 
 // New returns a syncer.

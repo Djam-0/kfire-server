@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/knightsofeternity/kfire-server/internal/connectors/riot"
+	"github.com/knightsofeternity/kfire-server/internal/livestate"
 	"github.com/knightsofeternity/kfire-server/internal/store"
 )
 
@@ -63,6 +64,19 @@ func (r *liveRegistry) get(userID string) *riot.LiveGame {
 	}
 	return e.game
 }
+
+// LivePublisher is the narrow slice of the WebSocket hub this package needs:
+// somewhere to announce that a member is, or is no longer, in a game.
+//
+// An interface rather than the hub itself, so this package keeps knowing
+// nothing about sockets, and so a test can watch what was published.
+type LivePublisher interface {
+	PublishLive(userID string, s livestate.State)
+}
+
+// SetLivePublisher wires the hub in. Wiring time only, like SetActiveCheck:
+// the hub is built after the syncer it needs.
+func (s *Syncer) SetLivePublisher(p LivePublisher) { s.publisher = p }
 
 // LiveGame returns a member's match in progress, or nil.
 func (s *Syncer) LiveGame(userID string) *riot.LiveGame {
@@ -129,5 +143,24 @@ func (s *Syncer) pollLive(ctx context.Context) {
 			}
 		}
 		s.live.set(p.UserID, live)
+
+		if s.publisher == nil {
+			continue
+		}
+		if live == nil {
+			s.publisher.PublishLive(p.UserID, livestate.State{Slug: liveSlug, Ended: true})
+			continue
+		}
+		// Only facts about this member. Spectator also names the nine other
+		// participants, and none of them consented to being broadcast here.
+		s.publisher.PublishLive(p.UserID, livestate.State{
+			Slug: liveSlug,
+			Match: map[string]any{
+				"champion_name": live.ChampionName,
+				"champion_icon": live.ChampionIcon,
+				"mode":          live.Mode,
+				"started_at":    live.StartedAt,
+			},
+		})
 	}
 }
