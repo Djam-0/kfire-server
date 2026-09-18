@@ -111,3 +111,43 @@ func TestLiveShapeRejectsWithErrInvalidLive(t *testing.T) {
 		t.Errorf("err = %v, want %v", err, livestate.ErrInvalidLive)
 	}
 }
+
+// Le contrat avec le client, épinglé par la charge utile qu'il produit VRAIMENT.
+//
+// Les deux moitiés vivent dans deux dépôts et ne sont jamais compilées ensemble :
+// rien d'autre que ce test ne remarquerait un `creepScore` devenu `creep_score`,
+// ou un flottant là où un entier est attendu. Le second cas est le plus vicieux,
+// parce que l'API locale de Riot sert bien `currentGold` et `gameTime` en
+// flottants : transmis tels quels, `json.Unmarshal` refuserait la charge utile
+// ENTIÈRE, et chaque état de direct serait rejeté sans explication.
+//
+// Ce JSON est copié depuis `live_payload` de kfire-client (`src/lol/mod.rs`).
+// S'il change là-bas, ce test doit casser ici.
+func TestLaChargeUtileDuClientEstAcceptee(t *testing.T) {
+	const duClient = `{"game_slug":"league-of-legends","champion":"Ahri","level":11,` +
+		`"kills":7,"deaths":2,"assists":9,"creep_score":142,"gold":8350,` +
+		`"game_time_seconds":843}`
+
+	out, err := (&LiveReporter{}).Shape([]byte(duClient))
+	if err != nil {
+		t.Fatalf("le serveur refuse ce que le client envoie : %v", err)
+	}
+	for _, k := range []string{"champion", "level", "kills", "deaths", "assists",
+		"creep_score", "gold", "game_time_seconds"} {
+		if _, ok := out[k]; !ok {
+			t.Errorf("champ %q perdu entre le client et la diffusion", k)
+		}
+	}
+}
+
+// Et la réciproque : un flottant doit être refusé bruyamment ici, pour que ce
+// soit ce test qui le dise et non un membre devant une carte qui ne vient pas.
+func TestUnFlottantEstRefuse(t *testing.T) {
+	const avecFlottant = `{"game_slug":"league-of-legends","champion":"Ahri","level":11,` +
+		`"kills":7,"deaths":2,"assists":9,"creep_score":142,"gold":8350.5,` +
+		`"game_time_seconds":843}`
+
+	if _, err := (&LiveReporter{}).Shape([]byte(avecFlottant)); err == nil {
+		t.Fatal("un or flottant doit être refusé, pas tronqué en silence")
+	}
+}
