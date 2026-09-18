@@ -18,6 +18,7 @@ export const fr: Catalog = {
 		players: 'Joueurs',
 		leaderboards: 'Classements',
 		games: 'Jeux',
+		live: 'Jeux en live',
 		download: "Obtenir l'app",
 		admin: 'Admin',
 		account: 'Compte'

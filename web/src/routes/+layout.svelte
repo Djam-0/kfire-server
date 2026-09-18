@@ -109,11 +109,17 @@
 
 	onDestroy(() => socket?.close());
 
-	let navItems = $derived([
+	// `live` marks the one entry that reflects the live store. It is decorated
+	// only while matches are running: a permanent accent would stop meaning
+	// "right now", and nobody should be drawn to a page with nothing on it.
+	type NavItem = { href: string; label: string; live?: boolean };
+
+	let navItems: NavItem[] = $derived([
 		{ href: '/', label: t('nav.dashboard') },
 		{ href: '/players', label: t('nav.players') },
 		{ href: '/leaderboards', label: t('nav.leaderboards') },
 		{ href: '/games', label: t('nav.games') },
+		{ href: '/live', label: t('nav.live'), live: true },
 		{ href: '/download', label: t('nav.download') },
 		...($auth.user?.role === 'admin' ? [{ href: '/admin', label: t('nav.admin') }] : []),
 		{ href: '/account', label: t('nav.account') }
@@ -157,15 +163,25 @@
 					{/if}
 					<nav class="flex gap-1">
 						{#each navItems as item (item.href)}
+							{@const isLive = item.live === true && liveMatches.count > 0}
 							<a
 								href={item.href}
-								class="font-display px-3 py-1.5 text-xs font-bold tracking-wider uppercase transition-colors {isActive(
-									item.href
-								)
-									? 'text-[var(--color-brand-bright)]'
-									: 'text-[var(--color-muted)] hover:text-[var(--color-text)]'}"
+								class="font-display px-3 py-1.5 text-xs font-bold tracking-wider uppercase transition-colors {isLive
+									? 'text-[var(--color-online)]'
+									: isActive(item.href)
+										? 'text-[var(--color-brand-bright)]'
+										: 'text-[var(--color-muted)] hover:text-[var(--color-text)]'}"
 							>
+								{#if isLive}
+									<span
+										class="live-dot mr-1 inline-block h-1.5 w-1.5 rounded-full bg-[var(--color-online)] align-middle"
+										aria-hidden="true"
+									></span>
+								{/if}
 								{item.label}
+								{#if isLive}
+									<span class="ml-0.5 tabular-nums">{liveMatches.count}</span>
+								{/if}
 								{#if isActive(item.href)}
 									<span class="mt-0.5 block h-0.5 w-full bg-[var(--color-brand)]"></span>
 								{/if}
@@ -188,3 +204,30 @@
 	{/if}
 	<Footer />
 </div>
+
+<style>
+	/*
+	 * The dot beats to say a match is running right now. Under reduced motion it
+	 * keeps its colour and simply stops beating: hiding it would take away the
+	 * information, not just the movement.
+	 */
+	.live-dot {
+		animation: live-pulse 1.4s ease-in-out infinite;
+	}
+
+	@keyframes live-pulse {
+		0%,
+		100% {
+			opacity: 1;
+		}
+		50% {
+			opacity: 0.25;
+		}
+	}
+
+	@media (prefers-reduced-motion: reduce) {
+		.live-dot {
+			animation: none;
+		}
+	}
+</style>

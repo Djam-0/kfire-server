@@ -17,6 +17,7 @@ export const en = {
 		players: 'Players',
 		leaderboards: 'Leaderboards',
 		games: 'Games',
+		live: 'Live games',
 		download: 'Get the app',
 		admin: 'Admin',
 		account: 'Account'
