@@ -18,6 +18,7 @@ export const fr: Catalog = {
 		players: 'Joueurs',
 		leaderboards: 'Classements',
 		games: 'Jeux',
+		live: 'Jeux en live',
 		download: "Obtenir l'app",
 		admin: 'Admin',
 		account: 'Compte'
@@ -89,6 +90,11 @@ export const fr: Catalog = {
 		empty: 'Aucun joueur trouvé.',
 		rlLive: 'En direct',
 		rlOvertime: 'Prol.'
+	},
+	live: {
+		heading: 'Jeux en live',
+		empty: 'Personne ne joue en ce moment.',
+		unknownMember: 'Un membre'
 	},
 	profile: {
 		loading: 'Chargement...',

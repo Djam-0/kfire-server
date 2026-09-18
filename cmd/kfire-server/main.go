@@ -21,6 +21,7 @@ import (
 	"github.com/knightsofeternity/kfire-server/internal/crypto"
 	"github.com/knightsofeternity/kfire-server/internal/games"
 	"github.com/knightsofeternity/kfire-server/internal/hearthstone"
+	"github.com/knightsofeternity/kfire-server/internal/livestate"
 	"github.com/knightsofeternity/kfire-server/internal/matchrecord"
 	"github.com/knightsofeternity/kfire-server/internal/rocketleague"
 	"github.com/knightsofeternity/kfire-server/internal/steamsync"
@@ -87,7 +88,10 @@ func main() {
 		hearthstone.NewRecorder(st),
 		rocketleague.NewRecorder(st),
 	)
-	hub := ws.NewHub([]byte(cfg.JWTSecret), st, cfg.PublicURL, recorders)
+	live := livestate.NewRegistry(
+		rocketleague.NewLiveReporter(),
+	)
+	hub := ws.NewHub([]byte(cfg.JWTSecret), st, cfg.PublicURL, recorders, live)
 
 	// Shared context for all background pollers.
 	pollCtx, cancelPoll := context.WithCancel(context.Background())

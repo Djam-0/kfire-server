@@ -81,9 +81,9 @@ itself knows no game: adding a third game means writing a `Recorder`
 (`Slug()` + `Record()`) and registering it in that list, without touching
 `hub.go`.
 
-**Two registries, easy to confuse.** `internal/gameplugin` and
-`internal/matchrecord` are both registries a new game gets added to, and they
-answer different questions:
+**Three registries, easy to confuse.** `internal/gameplugin`,
+`internal/matchrecord` and `internal/livestate` are all registries a new game
+gets added to, and they answer different questions:
 
 - `internal/gameplugin.Registry` governs what the pages display -- it carries
   the admin on/off switch (`game_plugins` table) and the crawl. See
@@ -92,6 +92,9 @@ answer different questions:
   that can read it. It has no admin switch and does not know whether the
   matching plugin is enabled. A recorder is registered separately, in
   `cmd/kfire-server/main.go`.
+- `internal/livestate.Registry` does the same for a match still in progress,
+  and is registered in the same place. A game can be in one and not the
+  other: a live state and a recorded result are independent.
 
 A game that reports match results is registered in **both**, in two
 different files, for two different reasons. Disabling the plugin hides the
@@ -99,10 +102,26 @@ display; it does not stop the recorder from writing, because the recorder
 never consults the plugin registry. See [PLUGINS.md](PLUGINS.md) for the
 consequence this has for Hearthstone and Rocket League.
 
-**The live match** (`live_match`) is the ephemeral counterpart: the current
-score, broadcast to the hub's normal presence channel while a match is still
-running, and never written to the database (`internal/ws/live.go`,
-`handleLiveMatch`). It is kept in memory next to presence, expires if no
+**The live match** (`live_match`) is the ephemeral counterpart: the state of a
+match still in progress, broadcast to the hub's normal presence channel and
+never written to the database. It is routed exactly like a match result, and
+for the same reason: `internal/livestate.Registry` resolves the payload's
+`game_slug` to the `Reporter` that claims it (`rocketleague.NewLiveReporter`),
+and the hub knows no game's fields. A `Reporter` validates the game's own
+payload and returns what will be broadcast, so a game never broadcasts more
+than it has validated. Adding a game to the live page means writing a
+`Reporter` and registering it in `cmd/kfire-server/main.go`, without touching
+`hub.go`.
+
+Three things stay common, and are checked before any reporter sees anything:
+the slug's shape, the generic end-of-match signal (`"ended": true`), and a
+**4 KiB cap on the payload**, enforced both on what the client sends and on
+what the reporter returns. The cap exists because this is the only message in
+KFIRE that takes data from one member's machine and relays it to everyone
+else's screen: a hostile or broken client must not be able to flood the
+guild's browsers.
+
+The state is kept in memory next to presence, expires if no
 update refreshes it within `liveTTL`, and is swept on a timer
 (`Hub.SweepLive`, started from `cmd/kfire-server/main.go`) so a game that
 crashes without closing the socket doesn't leave a frozen score on screen

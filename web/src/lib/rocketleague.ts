@@ -1,4 +1,40 @@
 import type { RlPlayer, RlMatch } from './api';
+import type { LiveEntry } from './stores/live.svelte';
+
+/** The slug the server uses for Rocket League on presence and live events. */
+export const RL_SLUG = 'rocket-league';
+
+/**
+ * A Rocket League match in progress, as broadcast twice a second on the
+ * presence socket. It is a strict subset of the end-of-match summary
+ * (`RlMatch`): no `team_size` and no `player_team`, so nothing here can say
+ * which mode is being played or which side the member is on.
+ */
+export type RlLiveMatch = {
+	team_blue_score: number;
+	team_orange_score: number;
+	seconds_remaining: number;
+	overtime: boolean;
+	goals: number;
+	assists: number;
+	saves: number;
+	shots: number;
+	score: number;
+	demos: number;
+};
+
+/**
+ * The Rocket League reading of a live entry, or `null` for anything else.
+ *
+ * The socket carries no type information beyond `game_slug`, so this is the
+ * single place where a live payload is asserted into a shape, and it happens
+ * only once the slug has been checked at runtime. Callers get a typed match or
+ * nothing, and never cast themselves.
+ */
+export function rlLiveMatch(entry: LiveEntry | undefined): RlLiveMatch | null {
+	if (!entry || entry.game_slug !== RL_SLUG) return null;
+	return entry.match as RlLiveMatch;
+}
 
 /**
  * Win rate across every reported match, as a whole percentage.

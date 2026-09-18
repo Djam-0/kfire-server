@@ -17,6 +17,7 @@ export const en = {
 		players: 'Players',
 		leaderboards: 'Leaderboards',
 		games: 'Games',
+		live: 'Live games',
 		download: 'Get the app',
 		admin: 'Admin',
 		account: 'Account'
@@ -88,6 +89,11 @@ export const en = {
 		empty: 'No players found.',
 		rlLive: 'Live',
 		rlOvertime: 'OT'
+	},
+	live: {
+		heading: 'Live games',
+		empty: 'Nobody is playing right now.',
+		unknownMember: 'A member'
 	},
 	profile: {
 		loading: 'Loading...',
