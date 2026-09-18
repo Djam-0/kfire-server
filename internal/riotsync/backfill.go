@@ -2,6 +2,7 @@ package riotsync
 
 import (
 	"context"
+	"errors"
 	"log/slog"
 	"time"
 
@@ -69,7 +70,13 @@ func (s *Syncer) backfillStep(ctx context.Context) {
 	}
 	game, err := s.store.GetGameBySlug(ctx, liveSlug)
 	if err != nil {
-		return // League absent from this catalog is a quiet, legitimate state
+		// League missing from this instance's catalog is a legitimate, quiet
+		// state. A database failure is not, and swallowing it here would hide
+		// it every two minutes forever. Same reasoning as pollLive.
+		if !errors.Is(err, store.ErrNotFound) {
+			slog.Warn("riotsync: get game", "slug", liveSlug, "err", err)
+		}
+		return
 	}
 	players, err := s.store.LolBackfillPending(ctx, backfillMembers)
 	if err != nil {
@@ -115,9 +122,21 @@ func (s *Syncer) backfillMember(ctx context.Context, p store.RiotPlayer, gameID 
 	var seen []time.Time
 	for _, id := range ids {
 		m, err := s.riot.MatchDetail(ctx, riot.MatchCluster(p.Platform), id, p.PUUID)
+		if riot.Transient(err) {
+			// Riot is rate-limiting us or having a bad minute. Abandon the page
+			// WITHOUT moving the cursor, so the next tick walks it again.
+			//
+			// Skipping instead would be silently destructive: the cursor would
+			// move past these matches and never come back, so a passing 429
+			// would carve a permanent hole in a history nobody can audit. The
+			// whole point of this walk is that it is complete.
+			slog.Warn("riotsync: backfill paused on a transient failure",
+				"user_id", p.UserID, "err", err)
+			return
+		}
 		if err != nil {
-			// A match Riot will not detail is skipped, not retried forever:
-			// the cursor must keep moving or the walk stalls on one bad id.
+			// A permanent answer: a 404, or a match that does not list this
+			// member. Retrying it forever would stall the walk on one bad id.
 			continue
 		}
 		seen = append(seen, m.PlayedAt)

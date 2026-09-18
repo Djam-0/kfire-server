@@ -224,7 +224,7 @@ func (c *Connector) matchDetail(ctx context.Context, cluster, matchID, puuid str
 			PlayedAt:        time.UnixMilli(raw.Info.GameEndTimestamp).UTC(),
 		}, nil
 	}
-	return MatchResult{}, fmt.Errorf("riot: match %s has no participant %s", matchID, puuid)
+	return MatchResult{}, fmt.Errorf("%w: match %s, puuid %s", ErrNoParticipant, matchID, puuid)
 }
 
 // ActiveGame returns the member's match in progress, or nil when they are not

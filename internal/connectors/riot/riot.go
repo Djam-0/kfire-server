@@ -89,3 +89,32 @@ func (c *Connector) Enabled() bool {
 
 // asAPIError is errors.As specialised to *APIError.
 func asAPIError(err error, target **APIError) bool { return errors.As(err, target) }
+
+// ErrNoParticipant means a match exists but does not list the member. It is a
+// permanent answer, not a hiccup: the match will never start listing them.
+var ErrNoParticipant = errors.New("riot: match has no such participant")
+
+// Transient reports whether an error is worth trying again later.
+//
+// The distinction matters to anything walking a history: a caller that treats
+// a rate limit like a missing match skips it FOREVER, leaving a hole nobody
+// can see afterwards, because a cursor that moved past it never comes back.
+//
+// Transient: a rate limit that survived the retries in get, a server-side
+// failure, a network or context error. Permanent: any other 4xx, and a match
+// that does not list the member.
+func Transient(err error) bool {
+	if err == nil {
+		return false
+	}
+	if errors.Is(err, ErrNoParticipant) {
+		return false
+	}
+	var e *APIError
+	if asAPIError(err, &e) {
+		return e.Status == http.StatusTooManyRequests || e.Status >= 500
+	}
+	// Not an answer from Riot at all: a dial failure, a timeout, a cancelled
+	// context. None of those say anything about the match itself.
+	return true
+}
