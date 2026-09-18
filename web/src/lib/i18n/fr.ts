@@ -229,7 +229,7 @@ export const fr: Catalog = {
 		hsHero: 'Héros',
 		hsTurns: 'Tours',
 		hsDate: 'Date',
-		hsModeBattlegrounds: 'Bataille de Champions',
+		hsModeBattlegrounds: 'Champs de bataille',
 		hsModeConstructed: 'Construit',
 		hsModeArena: 'Arène',
 		hsRatingNote:
