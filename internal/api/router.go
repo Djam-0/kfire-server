@@ -133,6 +133,9 @@ func Register(app *fiber.App, cfg *config.Config, st *store.Store, hub *ws.Hub, 
 	v1.Get("/presence", h.requireAuth, h.presence)
 	v1.Get("/leaderboards/weekly", h.requireAuth, h.weeklyLeaderboards)
 	v1.Get("/sessions", h.requireAuth, h.sessions)
+	// Session recap over a hand-picked range. NOT /sessions above, which
+	// serves presence sessions.
+	v1.Get("/recap", h.requireAuth, h.recap)
 	v1.Get("/achievements", h.requireAuth, h.userAchievements)
 
 	// External account connectors. The OpenID callback is a public browser
