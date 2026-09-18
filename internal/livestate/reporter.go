@@ -44,6 +44,14 @@ type Reporter interface {
 	// reporter MUST broadcast no more than it validated. The registry does
 	// not take that on trust: it measures what comes back and enforces the
 	// same MaxPayload bound on it.
+	//
+	// MUST be safe for concurrent use, and is best written as a pure function
+	// of raw. It is called from every member's connection at once, several
+	// times a second. A reporter holding mutable state shared between calls
+	// could let one member's fields land in another member's broadcast, and
+	// nothing here would catch it: the result would still be short, valid JSON
+	// under a slug the registry itself controls. That is the one hole this
+	// package cannot close for you, so it is stated rather than assumed.
 	Shape(raw json.RawMessage) (map[string]any, error)
 }
 
