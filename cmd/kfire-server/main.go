@@ -141,6 +141,7 @@ func main() {
 	// nothing while nobody is playing.
 	if cfg.RiotLolKey != "" {
 		go riotSync.RunLive(pollCtx, cfg.RiotLivePollInterval)
+		go riotSync.RunBackfill(pollCtx)
 	}
 
 	// Serve the embedded admin SPA (when built). Mounted last so API and
