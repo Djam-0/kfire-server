@@ -63,6 +63,10 @@ func TestRegistryEmptyAndMalformedSlug(t *testing.T) {
 		`{"game_slug":""}`,
 		`{"game_slug":"Rocket-League"}`,
 		`{"game_slug":"<script>alert(1)</script>"}`,
+		// Un slug à rallonge : le motif borne la longueur autant que
+		// l'alphabet. Ce cas vivait dans les tests de Rocket League avant
+		// que le slug ne devienne l'affaire du registre.
+		`{"game_slug":"` + strings.Repeat("a", 200) + `"}`,
 	} {
 		if _, err := reg.Shape(json.RawMessage(raw)); !errors.Is(err, ErrInvalidLive) {
 			t.Errorf("%s : Shape() = %v, want ErrInvalidLive", raw, err)

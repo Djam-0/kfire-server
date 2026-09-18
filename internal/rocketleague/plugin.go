@@ -17,9 +17,9 @@ type Plugin struct {
 // New builds the plugin.
 func New(st *store.Store) *Plugin { return &Plugin{st: st} }
 
-func (p *Plugin) ID() string      { return "rocket-league" }
+func (p *Plugin) ID() string      { return SLUG }
 func (p *Plugin) Name() string    { return "Rocket League" }
-func (p *Plugin) Slugs() []string { return []string{"rocket-league"} }
+func (p *Plugin) Slugs() []string { return []string{SLUG} }
 
 // Connector returns an empty string: Rocket League has no credential layer.
 // Same situation as Hearthstone.

@@ -158,7 +158,7 @@ type Recorder struct {
 func NewRecorder(st *store.Store) *Recorder { return &Recorder{st: st} }
 
 // Slug returns the claimed catalog slug.
-func (r *Recorder) Slug() string { return "rocket-league" }
+func (r *Recorder) Slug() string { return SLUG }
 
 // Record validates then writes a match.
 //
