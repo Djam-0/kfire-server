@@ -46,7 +46,7 @@ func (p payload) valid() bool {
 	if p.PlayedAt.IsZero() {
 		return false
 	}
-	if p.Mode != "battlegrounds" && p.Mode != "constructed" {
+	if p.Mode != modeBattlegrounds && p.Mode != modeConstructed {
 		return false
 	}
 	if p.Result != "win" && p.Result != "loss" && p.Result != "draw" {
@@ -79,7 +79,7 @@ type Recorder struct {
 func NewRecorder(st *store.Store) *Recorder { return &Recorder{st: st} }
 
 // Slug returns the claimed catalog slug.
-func (r *Recorder) Slug() string { return "hearthstone" }
+func (r *Recorder) Slug() string { return SLUG }
 
 // Record validates then writes a match.
 //
@@ -101,10 +101,26 @@ func (r *Recorder) Record(ctx context.Context, userID, gameID string, raw json.R
 		return fmt.Errorf("%w: rejected fields (mode=%q result=%q)",
 			matchrecord.ErrInvalidPayload, p.Mode, p.Result)
 	}
+	// A placement outside Battlegrounds is dropped, not refused, and the
+	// difference from the live reporter is deliberate.
+	//
+	// Constructed has no lobby, so such a placement is noise the game's log
+	// left behind. The statistics count EVERY row carrying a placement as a
+	// ranked game and average them, so keeping it would quietly skew a
+	// member's average finish and top-4 rate with a game that had neither.
+	//
+	// The live reporter refuses the whole payload instead, because a live
+	// state is re-sent seconds later and losing one costs nothing. A match
+	// result is written once and is gone forever if refused, so dropping one
+	// meaningless field beats dropping a game that was really played.
+	placement := p.Placement
+	if p.Mode != modeBattlegrounds {
+		placement = nil
+	}
 	return r.st.InsertHearthstoneMatch(ctx, store.HearthstoneMatch{
 		UserID: userID, GameID: gameID,
 		Mode: p.Mode, Result: p.Result,
-		Turns: p.Turns, Placement: p.Placement, HeroCardID: p.HeroCardID,
+		Turns: p.Turns, Placement: placement, HeroCardID: p.HeroCardID,
 		PlayedAt: p.PlayedAt,
 	})
 }

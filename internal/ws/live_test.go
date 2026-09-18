@@ -55,13 +55,13 @@ func TestLiveSharedState(t *testing.T) {
 
 	// La fin de partie efface l'état : c'est ce qui fait disparaître la carte
 	// du portail, donc c'est du comportement, pas un détail interne.
-	if !h.clearLive("u1") {
+	if !h.clearLive("u1", "rocket-league") {
 		t.Error("clearLive devait signaler qu'il y avait un match en cours")
 	}
 	if h.LiveMatch("u1") != nil {
 		t.Error("l'état survit à la fin du match")
 	}
-	if h.clearLive("u1") {
+	if h.clearLive("u1", "rocket-league") {
 		t.Error("clearLive sur un membre sans match doit rendre false")
 	}
 }
@@ -217,5 +217,53 @@ func TestExpiredUtiliseLaDureeDeLaSource(t *testing.T) {
 	}
 	if !(liveEntry{updatedAt: now.Add(-30 * time.Second)}).expired(now) {
 		t.Fatal("le défaut doit toujours expirer au-delà de liveTTL")
+	}
+}
+
+// La fin d'une partie ne doit effacer que l'état du jeu qui l'annonce.
+// L'état en cours est indexé par membre, pas par jeu : tant qu'un seul jeu
+// savait annoncer une fin, personne ne pouvait effacer la partie d'un autre.
+// Dès qu'un deuxième le peut, une fin de Hearthstone effacerait un match de
+// Rocket League encore en cours pour le même membre.
+func TestUneFinNEffaceQueSonPropreJeu(t *testing.T) {
+	h := NewHub([]byte("secret"), nil, "", nil, nil)
+	h.SetVisibility("membre", true, "online")
+	h.setLive("membre", livestate.State{
+		Slug:  "rocket-league",
+		Match: map[string]any{"team_blue_score": 2},
+	})
+
+	h.PublishLive(context.Background(), "membre", livestate.State{Slug: "hearthstone", Ended: true})
+	if h.LiveMatch("membre") == nil {
+		t.Fatal("une fin de Hearthstone a effacé le match de Rocket League")
+	}
+
+	// Et la fin du bon jeu efface bien, sinon la carte ne disparaîtrait jamais.
+	h.PublishLive(context.Background(), "membre", livestate.State{Slug: "rocket-league", Ended: true})
+	if h.LiveMatch("membre") != nil {
+		t.Fatal("la fin du jeu en cours doit effacer son état")
+	}
+}
+
+// clearLive est l'endroit où la règle vit : le test la vérifie aussi
+// directement, parce que handleLiveMatch passe par le même point.
+func TestClearLiveNEffaceQueLeJeuNomme(t *testing.T) {
+	h := NewHub(nil, nil, "", nil, nil)
+	h.setLive("membre", livestate.State{Slug: "rocket-league", Match: map[string]any{"x": 1}})
+
+	if h.clearLive("membre", "hearthstone") {
+		t.Error("clearLive a prétendu effacer un état qui n'est pas celui du jeu nommé")
+	}
+	if h.LiveMatch("membre") == nil {
+		t.Error("l'état d'un autre jeu doit survivre")
+	}
+	if !h.clearLive("membre", "rocket-league") {
+		t.Error("clearLive devait signaler qu'il y avait un match en cours")
+	}
+	if h.LiveMatch("membre") != nil {
+		t.Error("l'état survit à la fin du match")
+	}
+	if h.clearLive("membre", "rocket-league") {
+		t.Error("clearLive sur un membre sans match doit rendre false")
 	}
 }

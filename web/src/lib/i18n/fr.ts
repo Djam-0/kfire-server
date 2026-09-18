@@ -99,7 +99,9 @@ export const fr: Catalog = {
 		unknownChampion: 'Champion inconnu',
 		badge: 'En direct',
 		mode: 'Mode',
-		elapsed: 'Temps écoulé'
+		elapsed: 'Temps écoulé',
+		hsTurn: 'Tour',
+		hsPlacement: 'Position'
 	},
 	recap: {
 		title: 'Bilan de session',
@@ -227,7 +229,7 @@ export const fr: Catalog = {
 		hsHero: 'Héros',
 		hsTurns: 'Tours',
 		hsDate: 'Date',
-		hsModeBattlegrounds: 'Bataille de Champions',
+		hsModeBattlegrounds: 'Champs de bataille',
 		hsModeConstructed: 'Construit',
 		hsModeArena: 'Arène',
 		hsRatingNote:
