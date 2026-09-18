@@ -286,7 +286,9 @@ export const fr: Catalog = {
 		member: 'Membre',
 		soloQueue: 'Solo/Duo',
 		mainChampion: 'Champion principal',
-		formLabel: 'Cinq dernières',
+		gamesLabel: 'Parties',
+		historyWinRate: 'Taux de victoires',
+		kdaLabel: 'KDA',
 		winsLabel: 'Victoires',
 		lp: 'PL'
 	},

@@ -11,7 +11,8 @@
 		wowVersionName, wowVersionIcon
 	} from '$lib/wow';
 	import { inGame, mostPlayedChampion, podium, soloRank, tierSpread, winRate,
-	         crestURL, loadingArtURL, mainChampion, tierColour } from '$lib/lol';
+	         crestURL, loadingArtURL, mainChampion, tierColour,
+	         lolWinRate, lolKda } from '$lib/lol';
 	import {
 		hsWinRate,
 		hsTop4Rate,
@@ -51,6 +52,11 @@
 	const lolPodium = $derived(podium(lolPlayers));
 	const lolSpread = $derived(tierSpread(lolPlayers));
 	const lolMostPlayed = $derived(mostPlayedChampion(lolPlayers));
+	// The stored history, keyed by member. A member linked to Riot but with no
+	// match walked yet simply has no entry, and the row shows dashes rather
+	// than zeroes: nothing played and nothing known read differently.
+	const lolTotals = $derived(new Map((detail?.lol_totals ?? []).map((tt) => [tt.user_id, tt])));
+
 	// Ticks once a minute so the live durations stay honest without a reload.
 	let lolNow = $state(Date.now());
 	$effect(() => {
@@ -705,14 +711,16 @@
 				{t('lol.leaderboard')}
 			</h2>
 			<div class="pd-card overflow-x-auto">
-				<table class="w-full min-w-[640px] border-collapse">
+				<table class="w-full min-w-[820px] border-collapse">
 					<thead>
 						<tr class="border-b border-[var(--color-border)]">
 							<th class="w-10 px-3 py-2"></th>
 							<th class="px-3 py-2 text-left font-display text-xs uppercase tracking-wide text-[var(--color-muted)]">{t('lol.member')}</th>
 							<th class="px-3 py-2 text-left font-display text-xs uppercase tracking-wide text-[var(--color-muted)]">{t('lol.soloQueue')}</th>
 							<th class="px-3 py-2 text-left font-display text-xs uppercase tracking-wide text-[var(--color-muted)]">{t('lol.mainChampion')}</th>
-							<th class="px-3 py-2 text-left font-display text-xs uppercase tracking-wide text-[var(--color-muted)]">{t('lol.formLabel')}</th>
+							<th class="px-3 py-2 text-left font-display text-xs uppercase tracking-wide text-[var(--color-muted)]">{t('lol.gamesLabel')}</th>
+							<th class="px-3 py-2 text-left font-display text-xs uppercase tracking-wide text-[var(--color-muted)]">{t('lol.historyWinRate')}</th>
+							<th class="px-3 py-2 text-left font-display text-xs uppercase tracking-wide text-[var(--color-muted)]">{t('lol.kdaLabel')}</th>
 							<th class="px-3 py-2 text-left font-display text-xs uppercase tracking-wide text-[var(--color-muted)]">{t('lol.winsLabel')}</th>
 						</tr>
 					</thead>
@@ -721,6 +729,7 @@
 							{@const r = soloRank(p)}
 							{@const champ = mainChampion(p)}
 							{@const crest = r ? crestURL(r.tier) : null}
+							{@const tot = lolTotals.get(p.user_id)}
 							<tr
 								class="border-b border-[var(--color-border)]/50 last:border-b-0 hover:bg-[var(--color-surface-2)]
 									{p.user_id === $auth.user?.id ? 'bg-[var(--color-brand)]/10' : ''}"
@@ -760,17 +769,19 @@
 										</span>
 									{/if}
 								</td>
-								<td class="px-3 py-2">
-									<span class="flex gap-1">
-										{#each p.data.recent as m (m.match_id)}
-											<span
-												class="inline-block h-3.5 w-3.5 rounded-sm {m.win
-													? 'bg-[var(--color-online)]'
-													: 'bg-[var(--color-magenta)]'}"
-												title={m.champion}
-											></span>
-										{/each}
-									</span>
+								<td class="whitespace-nowrap px-3 py-2 text-sm tabular-nums text-[var(--color-text)]">
+									{tot ? tot.matches : '-'}
+								</td>
+								<td class="whitespace-nowrap px-3 py-2">
+									{#if tot}
+										<span class="font-display text-sm tabular-nums text-[var(--color-brand-bright)]">{lolWinRate(tot)}%</span>
+										<span class="ml-1 text-xs tabular-nums text-[var(--color-muted)]">{tot.wins}/{tot.matches - tot.wins}</span>
+									{:else}
+										<span class="text-sm text-[var(--color-muted)]">-</span>
+									{/if}
+								</td>
+								<td class="whitespace-nowrap px-3 py-2 text-sm tabular-nums text-[var(--color-text)]">
+									{tot ? lolKda(tot).toFixed(1) : '-'}
 								</td>
 								<td class="whitespace-nowrap px-3 py-2">
 									{#if r}

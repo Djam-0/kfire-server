@@ -97,6 +97,42 @@ export type LolMatch = {
 	played_at: string;
 };
 
+/**
+ * One stored League match, from the `lol_matches` table rather than from the
+ * hourly blob. Field names mirror the `json:` tags on `store.LolMatch`.
+ */
+export type LolStoredMatch = {
+	user_id: string;
+	game_id: string;
+	match_id: string;
+	champion: string;
+	win: boolean;
+	kills: number;
+	deaths: number;
+	assists: number;
+	queue_id: number;
+	duration_seconds: number;
+	played_at: string;
+};
+
+/**
+ * A member's aggregated League record, computed by the database over the whole
+ * stored history. Field names mirror `store.LolMemberStats`.
+ */
+export type LolTotals = {
+	user_id: string;
+	username: string;
+	avatar_url: string | null;
+	matches: number;
+	wins: number;
+	kills: number;
+	deaths: number;
+	assists: number;
+	/** Seconds. */
+	play_time: number;
+	last_played_at: string;
+};
+
 export type LolProfile = {
 	riot_id: string;
 	platform: string;
@@ -365,6 +401,8 @@ export type GameDetail = {
 	bnet_synced_at?: string;
 	lol_players?: LolPlayer[];
 	lol_synced_at?: string;
+	/** Every member's record over the stored history, not over the hourly blob. */
+	lol_totals?: LolTotals[];
 	hs_players?: HsPlayer[];
 	hs_heroes?: HsHero[];
 	rl_players?: RlPlayer[];
@@ -426,6 +464,8 @@ export type PlayerGameDetail = {
 	bnet_profile?: Record<string, unknown>;
 	lol_profile?: LolProfile;
 	lol_live?: LolLive;
+	/** The member's stored League matches, newest first. */
+	lol_recent?: LolStoredMatch[];
 	hs_profile?: HsProfile;
 	/** The member's last ten Rocket League matches, newest first. */
 	rl_matches?: RlMatch[];
