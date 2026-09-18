@@ -1,45 +1,13 @@
 package ws
 
 import (
-	"encoding/json"
 	"fmt"
-	"strings"
 	"sync"
 	"testing"
 	"time"
-)
 
-func TestLivePayloadValidation(t *testing.T) {
-	cases := []struct {
-		name string
-		body string
-		ok   bool
-	}{
-		{"en cours", `{"game_slug":"rocket-league","team_blue_score":2,"team_orange_score":1,"seconds_remaining":143,"overtime":false,"goals":1,"assists":0,"saves":2,"shots":3,"score":310,"demos":0}`, true},
-		{"prolongation", `{"game_slug":"rocket-league","team_blue_score":3,"team_orange_score":3,"seconds_remaining":47,"overtime":true,"goals":1,"assists":1,"saves":0,"shots":2,"score":280,"demos":1}`, true},
-		{"fin de match", `{"game_slug":"rocket-league","ended":true}`, true},
-		{"slug manquant", `{"team_blue_score":2,"team_orange_score":1,"seconds_remaining":143}`, false},
-		{"score negatif", `{"game_slug":"rocket-league","team_blue_score":-1,"team_orange_score":1,"seconds_remaining":143}`, false},
-		{"chrono negatif", `{"game_slug":"rocket-league","team_blue_score":2,"team_orange_score":1,"seconds_remaining":-5}`, false},
-		{"chrono aberrant", `{"game_slug":"rocket-league","team_blue_score":2,"team_orange_score":1,"seconds_remaining":99999}`, false},
-		{"stat negative", `{"game_slug":"rocket-league","team_blue_score":2,"team_orange_score":1,"seconds_remaining":143,"saves":-2}`, false},
-		{"score de match aberrant", `{"game_slug":"rocket-league","team_blue_score":999,"team_orange_score":1,"seconds_remaining":143}`, false},
-		{"slug avec du html", `{"game_slug":"<script>alert(1)</script>","team_blue_score":2,"team_orange_score":1,"seconds_remaining":143}`, false},
-		{"slug a rallonge", fmt.Sprintf(`{"game_slug":%q,"team_blue_score":2,"team_orange_score":1,"seconds_remaining":143}`, strings.Repeat("a", 200)), false},
-		{"slug majuscule", `{"game_slug":"Rocket-League","team_blue_score":2,"team_orange_score":1,"seconds_remaining":143}`, false},
-		{"stat aberrante", `{"game_slug":"rocket-league","team_blue_score":2,"team_orange_score":1,"seconds_remaining":143,"score":2147483647}`, false},
-	}
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			var p livePayload
-			err := json.Unmarshal([]byte(tc.body), &p)
-			got := err == nil && p.valid()
-			if got != tc.ok {
-				t.Errorf("valid() = %v, want %v", got, tc.ok)
-			}
-		})
-	}
-}
+	"github.com/knightsofeternity/kfire-server/internal/livestate"
+)
 
 func TestLiveExpire(t *testing.T) {
 	now := time.Now()
@@ -57,13 +25,16 @@ func TestLiveSharedState(t *testing.T) {
 	// A hub with no dependencies is enough: setLive and LiveMatch only touch
 	// the in-memory map. That is what makes this state testable while the
 	// rest of the hub is not.
-	h := NewHub(nil, nil, "", nil)
+	h := NewHub(nil, nil, "", nil, nil)
 
-	p := livePayload{
-		GameSlug: "rocket-league", TeamBlueScore: 2, TeamOrangeScore: 1,
-		SecondsRemaining: 143, Goals: 1, Saves: 2, Shots: 3, Score: 310,
+	s := livestate.State{
+		Slug: "rocket-league",
+		Match: map[string]any{
+			"team_blue_score": 2, "team_orange_score": 1,
+			"seconds_remaining": 143, "goals": 1, "saves": 2, "shots": 3, "score": 310,
+		},
 	}
-	h.setLive("u1", p)
+	h.setLive("u1", s)
 
 	got := h.LiveMatch("u1")
 	if got == nil {
@@ -82,7 +53,9 @@ func TestLiveSharedState(t *testing.T) {
 	}
 
 	// The end of a match clears it.
-	h.setLive("u1", livePayload{GameSlug: "rocket-league", Ended: true})
+	h.mu.Lock()
+	delete(h.live, "u1")
+	h.mu.Unlock()
 	if h.LiveMatch("u1") != nil {
 		t.Error("the state survives the end of the match")
 	}
@@ -92,7 +65,7 @@ func TestLiveSharedState(t *testing.T) {
 // shared map cross paths, which no other test in the package does. Without
 // it, `go test -race ./internal/ws/` proves nothing about h.live.
 func TestLiveConcurrentAccess(t *testing.T) {
-	h := NewHub(nil, nil, "", nil)
+	h := NewHub(nil, nil, "", nil, nil)
 
 	var wg sync.WaitGroup
 	for i := 0; i < 8; i++ {
@@ -101,7 +74,7 @@ func TestLiveConcurrentAccess(t *testing.T) {
 		go func() {
 			defer wg.Done()
 			for j := 0; j < 200; j++ {
-				h.setLive(member, livePayload{GameSlug: "rocket-league", TeamBlueScore: j % 5})
+				h.setLive(member, livestate.State{Slug: "rocket-league", Match: map[string]any{"team_blue_score": j % 5}})
 			}
 		}()
 		go func() {
@@ -115,12 +88,12 @@ func TestLiveConcurrentAccess(t *testing.T) {
 }
 
 func TestLiveVisibilityCutsTheStream(t *testing.T) {
-	h := NewHub(nil, nil, "", nil)
+	h := NewHub(nil, nil, "", nil, nil)
 	h.setLiveVisible("u1", true, "online")
 	if !h.liveAllowed("u1") {
 		t.Fatal("a visible member must be able to broadcast")
 	}
-	h.setLive("u1", livePayload{GameSlug: "rocket-league", TeamBlueScore: 1})
+	h.setLive("u1", livestate.State{Slug: "rocket-league", Match: map[string]any{"team_blue_score": 1}})
 
 	// They go hidden mid-match.
 	h.SetVisibility("u1", true, "invisible")
@@ -143,7 +116,7 @@ func TestLiveVisibilityCutsTheStream(t *testing.T) {
 // connection's read loop consults the permission. This is exactly the race
 // that made the first version of this fix unacceptable.
 func TestLiveVisibilityConcurrentAccess(t *testing.T) {
-	h := NewHub(nil, nil, "", nil)
+	h := NewHub(nil, nil, "", nil, nil)
 	var wg sync.WaitGroup
 	for i := 0; i < 4; i++ {
 		wg.Add(2)
@@ -157,7 +130,7 @@ func TestLiveVisibilityConcurrentAccess(t *testing.T) {
 			defer wg.Done()
 			for j := 0; j < 300; j++ {
 				if h.liveAllowed("u1") {
-					h.setLive("u1", livePayload{GameSlug: "rocket-league"})
+					h.setLive("u1", livestate.State{Slug: "rocket-league"})
 				}
 			}
 		}()

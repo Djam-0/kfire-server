@@ -15,6 +15,7 @@ import (
 	"github.com/gofiber/contrib/websocket"
 
 	"github.com/knightsofeternity/kfire-server/internal/auth"
+	"github.com/knightsofeternity/kfire-server/internal/livestate"
 	"github.com/knightsofeternity/kfire-server/internal/matchrecord"
 	"github.com/knightsofeternity/kfire-server/internal/store"
 )
@@ -122,6 +123,7 @@ type Hub struct {
 	store     *store.Store
 	publicURL string
 	recorders *matchrecord.Registry
+	reporters *livestate.Registry
 	mu        sync.RWMutex
 	clients   map[*client]struct{}
 	online    map[string]*onlineState // by user ID
@@ -142,13 +144,15 @@ type Hub struct {
 // NewHub creates an empty hub. jwtSecret verifies the access tokens presented
 // in `hello` handshakes; st persists sessions and resolves games; publicURL
 // builds image-proxy URLs in presence broadcasts; recorders routes a match
-// result to the game that knows how to read it.
-func NewHub(jwtSecret []byte, st *store.Store, publicURL string, recorders *matchrecord.Registry) *Hub {
+// result to the game that knows how to read it; reporters routes a live
+// state to the game that knows how to shape it.
+func NewHub(jwtSecret []byte, st *store.Store, publicURL string, recorders *matchrecord.Registry, reporters *livestate.Registry) *Hub {
 	return &Hub{
 		jwtSecret:   jwtSecret,
 		store:       st,
 		publicURL:   publicURL,
 		recorders:   recorders,
+		reporters:   reporters,
 		clients:     make(map[*client]struct{}),
 		online:      make(map[string]*onlineState),
 		live:        make(map[string]liveEntry),
@@ -225,7 +229,7 @@ func (h *Hub) unregister(c *client) {
 			if st.conns <= 0 {
 				delete(h.online, c.userID)
 				wasLastConn = true
-				hadLive = h.live[c.userID].payload.GameSlug != ""
+				_, hadLive = h.live[c.userID]
 				delete(h.live, c.userID)
 				delete(h.liveVisible, c.userID)
 			}
@@ -512,9 +516,24 @@ func (c *client) handleMatchResult(h *Hub, env Envelope) {
 // match and then disappears. It is the exact counterpart of presence, which
 // is broadcast and never archived.
 func (c *client) handleLiveMatch(h *Hub, env Envelope) {
-	var p livePayload
-	if err := json.Unmarshal(env.Payload, &p); err != nil || !p.valid() {
+	s, err := h.reporters.Shape(env.Payload)
+	switch {
+	case errors.Is(err, livestate.ErrUnknownGame), errors.Is(err, livestate.ErrInvalidLive):
+		// The client only gets a generic code; it has no use for our
+		// internal rules, same as an invalid match result.
 		c.sendError("invalid_live_match", "malformed live match state", false)
+		return
+	case err != nil:
+		slog.Error("ws: shape live match", "user_id", c.userID, "err", err)
+		c.sendError("invalid_live_match", "malformed live match state", false)
+		return
+	}
+
+	if s.Ended {
+		h.mu.Lock()
+		delete(h.live, c.userID)
+		h.mu.Unlock()
+		h.Broadcast("live_match", map[string]any{"user_id": c.userID, "match": nil})
 		return
 	}
 
@@ -525,19 +544,15 @@ func (c *client) handleLiveMatch(h *Hub, env Envelope) {
 		return
 	}
 
-	h.setLive(c.userID, p)
+	h.setLive(c.userID, s)
 	h.Broadcast("live_match", h.liveJSON(c.userID))
 }
 
-// setLive stores or clears a member's match state.
-func (h *Hub) setLive(userID string, p livePayload) {
+// setLive stores a member's match state.
+func (h *Hub) setLive(userID string, s livestate.State) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
-	if p.Ended {
-		delete(h.live, userID)
-		return
-	}
-	h.live[userID] = liveEntry{payload: p, updatedAt: time.Now()}
+	h.live[userID] = liveEntry{slug: s.Slug, match: s.Match, updatedAt: time.Now()}
 }
 
 // setLiveVisible stores what a member allows for their live match.
@@ -589,13 +604,20 @@ func (h *Hub) LiveMatch(userID string) map[string]any {
 	if !ok || e.expired(time.Now()) {
 		return nil
 	}
-	return liveEntryJSON(e.payload)
+	return e.match
 }
 
-// liveJSON builds the payload broadcast for a member: the state, or nil
-// when the match is over.
+// liveJSON builds what is broadcast for one member: the state, plus the game it
+// belongs to so the browser can pick its rendering, or a nil match when the
+// game is over.
 func (h *Hub) liveJSON(userID string) map[string]any {
-	return map[string]any{"user_id": userID, "match": h.LiveMatch(userID)}
+	h.mu.RLock()
+	e, ok := h.live[userID]
+	h.mu.RUnlock()
+	if !ok || e.expired(time.Now()) {
+		return map[string]any{"user_id": userID, "match": nil}
+	}
+	return map[string]any{"user_id": userID, "game_slug": e.slug, "match": e.match}
 }
 
 // SweepLive clears match states that no sample has refreshed since liveTTL,
@@ -628,23 +650,6 @@ func (h *Hub) SweepLive(ctx context.Context) {
 				h.Broadcast("live_match", map[string]any{"user_id": id, "match": nil})
 			}
 		}
-	}
-}
-
-// liveEntryJSON is the shape sent to the browser.
-func liveEntryJSON(p livePayload) map[string]any {
-	return map[string]any{
-		"game_slug":         p.GameSlug,
-		"team_blue_score":   p.TeamBlueScore,
-		"team_orange_score": p.TeamOrangeScore,
-		"seconds_remaining": p.SecondsRemaining,
-		"overtime":          p.Overtime,
-		"goals":             p.Goals,
-		"assists":           p.Assists,
-		"saves":             p.Saves,
-		"shots":             p.Shots,
-		"score":             p.Score,
-		"demos":             p.Demos,
 	}
 }
 
