@@ -101,7 +101,11 @@ export const fr: Catalog = {
 		mode: 'Mode',
 		elapsed: 'Temps écoulé',
 		hsTurn: 'Tour',
-		hsPlacement: 'Position'
+		hsPlacement: 'Position',
+		lolLevel: 'Niveau',
+		lolKda: 'KDA',
+		lolCreeps: 'Sbires',
+		lolGold: 'Or'
 	},
 	recap: {
 		title: 'Bilan de session',

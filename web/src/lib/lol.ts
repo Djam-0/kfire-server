@@ -5,17 +5,34 @@ import type { LiveEntry } from './stores/live.svelte';
 export const LOL_SLUG = 'league-of-legends';
 
 /**
- * A League game in progress, as the server's Spectator poller publishes it.
+ * A League game in progress, in either of the two shapes the server publishes
+ * under this one slug.
  *
- * Far poorer than Rocket League's, and that is inherent: Spectator is read
- * from Riot, not from the member's machine, and it knows the champion and the
- * start, never the score.
+ * The poor one comes from Riot's Spectator API, polled by the server, which
+ * knows the champion and the start and never the score. The rich one comes
+ * from Riot's local API on the member's own machine, pushed by the desktop
+ * client, which knows the level, the KDA, the creeps and the gold.
+ *
+ * Every field is therefore optional and the card renders what it has. One
+ * game, one card: two components for the same slug would have had to agree on
+ * everything anyway, and would have drifted apart the first time one of them
+ * changed.
  */
 export type LolLiveMatch = {
-	champion_name: string;
-	champion_icon: string;
-	mode: string;
-	started_at: string;
+	// Spectator's shape.
+	champion_name?: string;
+	champion_icon?: string;
+	mode?: string;
+	started_at?: string;
+	// The local API's shape, pushed by the client.
+	champion?: string;
+	level?: number;
+	kills?: number;
+	deaths?: number;
+	assists?: number;
+	creep_score?: number;
+	gold?: number;
+	game_time_seconds?: number;
 };
 
 /**
