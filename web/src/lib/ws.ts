@@ -13,7 +13,6 @@ export type PresenceSocket = { close: () => void };
  * `live_match` event) means that member's match just ended.
  */
 export type LiveMatch = {
-	game_slug: string;
 	team_blue_score: number;
 	team_orange_score: number;
 	seconds_remaining: number;
@@ -26,9 +25,14 @@ export type LiveMatch = {
 	demos: number;
 };
 
-/** A `live_match` event: one member's current match state, or its end. */
+/**
+ * A `live_match` event: one member's current match state, or its end.
+ * `game_slug` names the game the match belongs to, so a consumer can pick a
+ * rendering for it; it is absent when `match` is `null`.
+ */
 export type LiveMatchUpdate = {
 	user_id: string;
+	game_slug?: string;
 	match: LiveMatch | null;
 };
 

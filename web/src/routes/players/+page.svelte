@@ -3,7 +3,8 @@
 	import { get } from 'svelte/store';
 	import { api, type PresenceEntry } from '$lib/api';
 	import { auth } from '$lib/stores/auth.svelte';
-	import { connectPresence, type PresenceSocket, type LiveMatch } from '$lib/ws';
+	import { connectPresence, type PresenceSocket } from '$lib/ws';
+	import { liveMatches } from '$lib/stores/live.svelte';
 	import { formatClock } from '$lib/format';
 	import Avatar from '$lib/components/Avatar.svelte';
 	import StatusBadge from '$lib/components/StatusBadge.svelte';
@@ -13,12 +14,6 @@
 	// Without the live subscription the list froze at page-load state: a member
 	// who went offline still showed online until a manual reload.
 	let entries = $state<Map<string, PresenceEntry>>(new Map());
-	// Keyed by user_id, same reasoning: a live_match event overwrites this
-	// member's score, and a `null` match removes him from the map so the row
-	// shows nothing again. Never seeded from the initial snapshot: there is no
-	// REST endpoint for it, by design, so a page opened mid-match simply picks
-	// up the next sample within about half a second.
-	let liveMatches = $state<Map<string, LiveMatch>>(new Map());
 	let query = $state('');
 	let loading = $state(true);
 	let socket: PresenceSocket | null = null;
@@ -47,15 +42,7 @@
 				entries = next;
 			},
 			() => {},
-			(update) => {
-				const next = new Map(liveMatches);
-				if (update.match && update.match.game_slug === 'rocket-league') {
-					next.set(update.user_id, update.match);
-				} else {
-					next.delete(update.user_id);
-				}
-				liveMatches = next;
-			}
+			(update) => liveMatches.apply(update)
 		);
 	});
 
@@ -93,8 +80,8 @@
 							>{m.game.name}</span
 						>
 					{/if}
-					{#if liveMatches.has(m.user_id)}
-						{@const lm = liveMatches.get(m.user_id)!}
+					{#if liveMatches.get(m.user_id)?.game_slug === 'rocket-league'}
+						{@const lm = liveMatches.get(m.user_id)!.match}
 						<span
 							class="pd-cut-sm flex shrink-0 items-center gap-1.5 bg-[var(--color-online)]/15 px-2 py-0.5 font-display text-xs font-bold italic"
 						>
