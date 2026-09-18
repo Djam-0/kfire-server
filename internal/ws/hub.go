@@ -709,3 +709,28 @@ func (c *client) closeWithError(closeCode int, code, message string) {
 		websocket.FormatCloseMessage(closeCode, message), time.Now().Add(time.Second))
 	_ = c.conn.Close()
 }
+
+// PublishLive records a live state that did NOT come from a member's client,
+// and broadcasts it like any other.
+//
+// Rocket League is pushed by the member's own machine over this socket; League
+// of Legends is pulled by the server from Riot's Spectator API, so it has no
+// connection to arrive on. The visibility rule is the same either way: a member
+// who asked not to be seen is not seen, whoever the state came from.
+//
+// The state is NOT passed through livestate.Registry: a registry shapes what an
+// untrusted client sent. This one is built by our own code from a typed answer,
+// so there is nothing to validate that the compiler has not already checked.
+func (h *Hub) PublishLive(userID string, s livestate.State) {
+	if s.Ended {
+		if h.clearLive(userID) {
+			h.Broadcast("live_match", h.liveJSON(userID))
+		}
+		return
+	}
+	if !h.liveAllowed(userID) {
+		return
+	}
+	h.setLive(userID, s)
+	h.Broadcast("live_match", h.liveJSON(userID))
+}

@@ -167,3 +167,31 @@ func TestLiveVisibilityConcurrentAccess(t *testing.T) {
 	}
 	wg.Wait()
 }
+
+func TestPublishLiveRespecteLInvisibilite(t *testing.T) {
+	h := NewHub([]byte("secret"), nil, "", nil, nil)
+	h.SetVisibility("membre", false, "online")
+	h.PublishLive("membre", livestate.State{
+		Slug:  "league-of-legends",
+		Match: map[string]any{"champion": "Ahri"},
+	})
+	if h.LiveMatch("membre") != nil {
+		t.Fatal("un membre invisible ne doit pas apparaître, même publié par le serveur")
+	}
+}
+
+func TestPublishLiveStockeEtEfface(t *testing.T) {
+	h := NewHub([]byte("secret"), nil, "", nil, nil)
+	h.SetVisibility("membre", true, "online")
+	h.PublishLive("membre", livestate.State{
+		Slug:  "league-of-legends",
+		Match: map[string]any{"champion": "Ahri"},
+	})
+	if h.LiveMatch("membre") == nil {
+		t.Fatal("l'état publié doit être visible")
+	}
+	h.PublishLive("membre", livestate.State{Slug: "league-of-legends", Ended: true})
+	if h.LiveMatch("membre") != nil {
+		t.Fatal("la fin doit effacer l'état")
+	}
+}
