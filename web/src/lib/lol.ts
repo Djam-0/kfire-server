@@ -1,4 +1,34 @@
-import type { LolPlayer, LolProfile, LolRank } from './api';
+import type { LolPlayer, LolProfile, LolRank, LolTotals } from './api';
+import type { LiveEntry } from './stores/live.svelte';
+
+/** The slug the server uses for League of Legends. */
+export const LOL_SLUG = 'league-of-legends';
+
+/**
+ * A League game in progress, as the server's Spectator poller publishes it.
+ *
+ * Far poorer than Rocket League's, and that is inherent: Spectator is read
+ * from Riot, not from the member's machine, and it knows the champion and the
+ * start, never the score.
+ */
+export type LolLiveMatch = {
+	champion_name: string;
+	champion_icon: string;
+	mode: string;
+	started_at: string;
+};
+
+/**
+ * The League reading of a live entry, or `null` for anything else.
+ *
+ * The socket carries no type information beyond `game_slug`, so this is the
+ * single place where a League live payload is asserted into a shape, and it
+ * happens only once the slug has been checked at runtime.
+ */
+export function lolLiveMatch(entry: LiveEntry | undefined): LolLiveMatch | null {
+	if (!entry || entry.game_slug !== LOL_SLUG) return null;
+	return entry.match as LolLiveMatch;
+}
 
 export const SOLO_QUEUE = 'RANKED_SOLO_5x5';
 export const FLEX_QUEUE = 'RANKED_FLEX_SR';
@@ -44,6 +74,16 @@ export function soloRank(p: { data: LolProfile }): LolRank | undefined {
 
 export function flexRank(p: { data: LolProfile }): LolRank | undefined {
 	return p.data.ranks.find((r) => r.queue === FLEX_QUEUE);
+}
+
+/**
+ * Average KDA, deaths counted as one when there are none.
+ *
+ * A perfect game would otherwise divide by zero, and showing Infinity where a
+ * number belongs is worse than slightly understating a rare result.
+ */
+export function lolKda(t: LolTotals): number {
+	return Math.round(((t.kills + t.assists) / Math.max(t.deaths, 1)) * 10) / 10;
 }
 
 export function winRate(r: { wins: number; losses: number }): number {

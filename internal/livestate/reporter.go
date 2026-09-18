@@ -9,6 +9,7 @@
 package livestate
 
 import (
+	"time"
 	"encoding/json"
 	"errors"
 	"regexp"
@@ -63,6 +64,15 @@ type State struct {
 	Ended bool
 	// Match is what the reporter validated, or nil when Ended.
 	Match map[string]any
+	// TTL is how long this state stays trustworthy without a fresh sample.
+	// Zero means the default, which is sized for a client sampling twice a
+	// second.
+	//
+	// It exists because sources have wildly different rhythms: a desktop
+	// client pushes twice a second, while a server-side poller may only
+	// refresh once a minute. One constant cannot serve both, and the slower
+	// source would otherwise be swept away between two samples and flicker.
+	TTL time.Duration
 }
 
 // envelope is all the registry itself needs to understand.

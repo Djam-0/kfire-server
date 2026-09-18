@@ -3,6 +3,7 @@ package riotsync
 import (
 	"context"
 	"encoding/json"
+	"log/slog"
 	"slices"
 	"sort"
 
@@ -25,6 +26,11 @@ type LolPlugin struct {
 func NewLolPlugin(st *store.Store, s *Syncer, conn *riot.Connector) *LolPlugin {
 	return &LolPlugin{st: st, syncer: s, conn: conn}
 }
+
+// recentMatchRows is how many stored matches a member's page lists. Forty, like
+// Hearthstone's, because the table can now answer it: the old cap of five was
+// the API's cost, not a design choice.
+const recentMatchRows = 40
 
 func (p *LolPlugin) ID() string        { return "lol" }
 func (p *LolPlugin) Name() string      { return "League of Legends" }
@@ -110,7 +116,17 @@ func (p *LolPlugin) GameDetail(ctx context.Context, viewerID string, g store.Gam
 		cards[i] = card
 	}
 	sortByScore(cards)
-	return map[string]any{"lol_players": cards, "lol_synced_at": synced}, nil
+	out := map[string]any{"lol_players": cards, "lol_synced_at": synced}
+	// Aggregated by the database over the whole stored history, so the page can
+	// stop describing a member's form from the five matches the blob happens to
+	// hold. A failure here costs the extra column, not the leaderboard.
+	stats, err := p.st.LolStatsByGame(ctx, g.ID)
+	if err != nil {
+		slog.Warn("riotsync: lol stats", "game_id", g.ID, "err", err)
+		stats = nil
+	}
+	out["lol_totals"] = stats
+	return out, nil
 }
 
 // UserGameDetail returns one member's League card.
@@ -132,5 +148,14 @@ func (p *LolPlugin) UserGameDetail(ctx context.Context, userID string, g store.G
 			out["lol_live"] = live
 		}
 	}
+	// The blob's `recent` is capped at five and rewritten hourly. This one is
+	// the stored history, so a member's page finally shows what they played
+	// rather than what they played in the last hour.
+	recent, err := p.st.LolRecentFor(ctx, userID, g.ID, recentMatchRows)
+	if err != nil {
+		slog.Warn("riotsync: recent matches", "user_id", userID, "err", err)
+		recent = nil
+	}
+	out["lol_recent"] = recent
 	return out, nil
 }

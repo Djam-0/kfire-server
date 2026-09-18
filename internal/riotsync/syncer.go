@@ -28,6 +28,8 @@ type Syncer struct {
 	dd     *riot.DataDragon
 	live   *liveRegistry
 	active func() bool
+
+	publisher LivePublisher
 }
 
 // New returns a syncer.
@@ -141,6 +143,23 @@ func (s *Syncer) RefreshLoL(ctx context.Context, userID, gameID string) {
 	if err != nil {
 		slog.Warn("riotsync: recent matches", "user_id", userID, "err", err)
 		return
+	}
+
+	// The blob stays the contract for ranks and masteries, which are a current
+	// standing. Matches are history, and history belongs in a table: the blob
+	// is rewritten whole on every refresh, so anything left only in there is
+	// lost an hour later.
+	for _, m := range recent {
+		if err := s.store.InsertLolMatch(ctx, store.LolMatch{
+			UserID: userID, GameID: gameID, MatchID: m.MatchID,
+			Champion: m.Champion, Win: m.Win,
+			Kills: m.Kills, Deaths: m.Deaths, Assists: m.Assists,
+			QueueID: m.QueueID, DurationSeconds: m.DurationSeconds,
+			PlayedAt: m.PlayedAt,
+		}); err != nil {
+			// One unstorable match must not lose the refresh's other work.
+			slog.Warn("riotsync: store match", "user_id", userID, "match_id", m.MatchID, "err", err)
+		}
 	}
 
 	blob := buildProfile(acc.RiotID, acc.Platform, ranks, champions, recent)

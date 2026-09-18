@@ -95,6 +95,9 @@ func Register(app *fiber.App, cfg *config.Config, st *store.Store, hub *ws.Hub, 
 	riotSync.SetActiveCheck(func() bool {
 		return len(plugins.ForSlug(lolPlugin.Slugs()[0])) > 0
 	})
+	// League's live state is pulled by the server, so it reaches the hub here
+	// rather than over a member's socket.
+	riotSync.SetLivePublisher(hub)
 	xblConn := xbox.New(cfg.XblAppKey)
 	if cfg.XblAPIBase != "" {
 		xblConn.APIBase = cfg.XblAPIBase

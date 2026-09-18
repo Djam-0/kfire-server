@@ -94,7 +94,11 @@ export const en = {
 	live: {
 		heading: 'Live games',
 		empty: 'Nobody is playing right now.',
-		unknownMember: 'A member'
+		unknownMember: 'A member',
+		unknownChampion: 'Unknown champion',
+		badge: 'Live',
+		mode: 'Mode',
+		elapsed: 'Elapsed'
 	},
 	recap: {
 		title: 'Session recap',
@@ -281,7 +285,8 @@ export const en = {
 		member: 'Member',
 		soloQueue: 'Solo/Duo',
 		mainChampion: 'Main champion',
-		formLabel: 'Last five',
+		gamesLabel: 'Games',
+		kdaLabel: 'KDA',
 		winsLabel: 'Wins',
 		lp: 'LP'
 	},

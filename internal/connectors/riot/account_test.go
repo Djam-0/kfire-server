@@ -29,6 +29,9 @@ func fakeRiot(t *testing.T, routes map[string]string) *Connector {
 	c := New("RGAPI-test")
 	// %s swallows the host segment; every host resolves to the fake.
 	c.APIHostTmpl = srv.URL + "/%s"
+	// The fake host has no quota to protect, and the production rate would
+	// stretch these tests to minutes. Production keeps the default.
+	c.SetRate(1000)
 	return c
 }
 

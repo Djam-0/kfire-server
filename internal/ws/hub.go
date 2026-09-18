@@ -550,7 +550,7 @@ func (c *client) handleLiveMatch(h *Hub, env Envelope) {
 func (h *Hub) setLive(userID string, s livestate.State) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
-	h.live[userID] = liveEntry{slug: s.Slug, match: s.Match, updatedAt: time.Now()}
+	h.live[userID] = liveEntry{slug: s.Slug, match: s.Match, updatedAt: time.Now(), ttl: s.TTL}
 }
 
 // clearLive forgets a member's live match and says whether there was one.
@@ -577,6 +577,37 @@ func (h *Hub) setLiveVisible(userID string, activityVisible bool, presenceStatus
 }
 
 // liveAllowed reports whether this member's live match may be broadcast.
+// liveAllowedOrLoad answers the visibility question even for a member the hub
+// has never seen on a connection.
+//
+// h.liveVisible is filled when a client authenticates, which was enough while
+// every live state arrived over a connection. A state pulled by the server does
+// not: a member playing League with no KFIRE client running has no entry at
+// all, and the plain map lookup would read the zero value and refuse them
+// forever. That would make the whole server-pulled path silently mute, which is
+// precisely the case it exists to serve.
+//
+// The answer is then read from the database and cached, so this costs one query
+// per member per server lifetime, not one per poll.
+func (h *Hub) liveAllowedOrLoad(ctx context.Context, userID string) bool {
+	h.mu.RLock()
+	allowed, known := h.liveVisible[userID]
+	h.mu.RUnlock()
+	if known {
+		return allowed
+	}
+	if h.store == nil {
+		return false
+	}
+	u, err := h.store.GetUserByID(ctx, userID)
+	if err != nil {
+		// Unknown member, or the database is down. Either way, staying quiet is
+		// the safe direction: this decides whether someone is shown to others.
+		return false
+	}
+	return h.setLiveVisible(userID, u.ActivityVisible, u.PresenceStatus)
+}
+
 func (h *Hub) liveAllowed(userID string) bool {
 	h.mu.RLock()
 	defer h.mu.RUnlock()
@@ -708,4 +739,29 @@ func (c *client) closeWithError(closeCode int, code, message string) {
 	_ = c.conn.WriteControl(websocket.CloseMessage,
 		websocket.FormatCloseMessage(closeCode, message), time.Now().Add(time.Second))
 	_ = c.conn.Close()
+}
+
+// PublishLive records a live state that did NOT come from a member's client,
+// and broadcasts it like any other.
+//
+// Rocket League is pushed by the member's own machine over this socket; League
+// of Legends is pulled by the server from Riot's Spectator API, so it has no
+// connection to arrive on. The visibility rule is the same either way: a member
+// who asked not to be seen is not seen, whoever the state came from.
+//
+// The state is NOT passed through livestate.Registry: a registry shapes what an
+// untrusted client sent. This one is built by our own code from a typed answer,
+// so there is nothing to validate that the compiler has not already checked.
+func (h *Hub) PublishLive(ctx context.Context, userID string, s livestate.State) {
+	if s.Ended {
+		if h.clearLive(userID) {
+			h.Broadcast("live_match", h.liveJSON(userID))
+		}
+		return
+	}
+	if !h.liveAllowedOrLoad(ctx, userID) {
+		return
+	}
+	h.setLive(userID, s)
+	h.Broadcast("live_match", h.liveJSON(userID))
 }

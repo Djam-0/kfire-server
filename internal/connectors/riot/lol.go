@@ -153,6 +153,45 @@ func (c *Connector) RecentMatches(ctx context.Context, cluster, puuid string, n 
 	return res, nil
 }
 
+// maxMatchIDsPerPage is Riot's own ceiling on the ids route.
+const maxMatchIDsPerPage = 100
+
+// MatchIDsBefore returns up to n match ids played before the given instant,
+// newest first. A zero instant means "from the most recent".
+//
+// The window is bounded by TIME rather than by an offset because the backfill
+// runs for hours while the member keeps playing: new matches shift every
+// offset, so an offset cursor would silently skip matches. An instant is not
+// shifted by anything.
+func (c *Connector) MatchIDsBefore(ctx context.Context, cluster, puuid string,
+	before time.Time, n int) ([]string, error) {
+
+	if n <= 0 || n > maxMatchIDsPerPage {
+		n = maxMatchIDsPerPage
+	}
+	q := url.Values{}
+	q.Set("start", "0")
+	q.Set("count", strconv.Itoa(n))
+	if !before.IsZero() {
+		q.Set("endTime", strconv.FormatInt(before.Unix(), 10))
+	}
+	path := "/lol/match/v5/matches/by-puuid/" + url.PathEscape(puuid) + "/ids?" + q.Encode()
+
+	var ids []string
+	if err := c.get(ctx, cluster, path, &ids); err != nil {
+		return nil, err
+	}
+	return ids, nil
+}
+
+// MatchDetail reads one match and keeps only the given member's participation.
+//
+// Exported for the backfill, which walks ids one page at a time and needs the
+// detail of each; RecentMatches keeps using the unexported form.
+func (c *Connector) MatchDetail(ctx context.Context, cluster, matchID, puuid string) (MatchResult, error) {
+	return c.matchDetail(ctx, cluster, matchID, puuid)
+}
+
 // matchDetail reads one match and keeps only the given member's participation.
 func (c *Connector) matchDetail(ctx context.Context, cluster, matchID, puuid string) (MatchResult, error) {
 	var raw struct {
@@ -185,7 +224,7 @@ func (c *Connector) matchDetail(ctx context.Context, cluster, matchID, puuid str
 			PlayedAt:        time.UnixMilli(raw.Info.GameEndTimestamp).UTC(),
 		}, nil
 	}
-	return MatchResult{}, fmt.Errorf("riot: match %s has no participant %s", matchID, puuid)
+	return MatchResult{}, fmt.Errorf("%w: match %s, puuid %s", ErrNoParticipant, matchID, puuid)
 }
 
 // ActiveGame returns the member's match in progress, or nil when they are not
