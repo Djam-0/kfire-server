@@ -98,7 +98,9 @@ export const en = {
 		unknownChampion: 'Unknown champion',
 		badge: 'Live',
 		mode: 'Mode',
-		elapsed: 'Elapsed'
+		elapsed: 'Elapsed',
+		hsTurn: 'Turn',
+		hsPlacement: 'Placement'
 	},
 	recap: {
 		title: 'Session recap',

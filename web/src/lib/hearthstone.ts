@@ -1,9 +1,38 @@
 import type { HsProfile, HsProfileHero, HsRecentMatch, HsPlayer } from './api';
+import type { LiveEntry } from './stores/live.svelte';
 import { getLocale, t } from './i18n';
 import heroes from './hs-heroes.json';
 
 /** The slug the server uses for Hearthstone on recaps and presence. */
 export const HS_SLUG = 'hearthstone';
+
+/**
+ * A Hearthstone game in progress, as the desktop client reports it.
+ *
+ * Deliberately this short, and not a subset of anything: the game's log names
+ * the opponent and lists every card played, and none of that is broadcast. The
+ * mode is one of the two the server accepts, never a free string.
+ *
+ * `placement` only exists in Battlegrounds; a constructed game carries no such
+ * key at all, which is why it is optional rather than nullable.
+ */
+export type HsLiveMatch = {
+	mode: string;
+	turn: number;
+	placement?: number;
+};
+
+/**
+ * The Hearthstone reading of a live entry, or `null` for anything else.
+ *
+ * The socket carries no type information beyond `game_slug`, so this is the
+ * single place where a Hearthstone live payload is asserted into a shape, and
+ * it happens only once the slug has been checked at runtime.
+ */
+export function hsLiveMatch(entry: LiveEntry | undefined): HsLiveMatch | null {
+	if (!entry || entry.game_slug !== HS_SLUG) return null;
+	return entry.match as HsLiveMatch;
+}
 
 /** Mode labels the catalog knows; anything else shows the raw mode name. */
 const HS_MODE_KEYS: Record<string, string> = {

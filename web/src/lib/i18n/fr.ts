@@ -99,7 +99,9 @@ export const fr: Catalog = {
 		unknownChampion: 'Champion inconnu',
 		badge: 'En direct',
 		mode: 'Mode',
-		elapsed: 'Temps écoulé'
+		elapsed: 'Temps écoulé',
+		hsTurn: 'Tour',
+		hsPlacement: 'Position'
 	},
 	recap: {
 		title: 'Bilan de session',
