@@ -286,7 +286,6 @@ export const en = {
 		soloQueue: 'Solo/Duo',
 		mainChampion: 'Main champion',
 		gamesLabel: 'Games',
-		historyWinRate: 'Win rate',
 		kdaLabel: 'KDA',
 		winsLabel: 'Wins',
 		lp: 'LP'

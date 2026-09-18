@@ -287,7 +287,6 @@ export const fr: Catalog = {
 		soloQueue: 'Solo/Duo',
 		mainChampion: 'Champion principal',
 		gamesLabel: 'Parties',
-		historyWinRate: 'Taux de victoires',
 		kdaLabel: 'KDA',
 		winsLabel: 'Victoires',
 		lp: 'PL'

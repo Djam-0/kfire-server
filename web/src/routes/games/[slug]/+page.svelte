@@ -12,7 +12,7 @@
 	} from '$lib/wow';
 	import { inGame, mostPlayedChampion, podium, soloRank, tierSpread, winRate,
 	         crestURL, loadingArtURL, mainChampion, tierColour,
-	         lolWinRate, lolKda } from '$lib/lol';
+	         lolKda } from '$lib/lol';
 	import {
 		hsWinRate,
 		hsTop4Rate,
@@ -719,7 +719,6 @@
 							<th class="px-3 py-2 text-left font-display text-xs uppercase tracking-wide text-[var(--color-muted)]">{t('lol.soloQueue')}</th>
 							<th class="px-3 py-2 text-left font-display text-xs uppercase tracking-wide text-[var(--color-muted)]">{t('lol.mainChampion')}</th>
 							<th class="px-3 py-2 text-left font-display text-xs uppercase tracking-wide text-[var(--color-muted)]">{t('lol.gamesLabel')}</th>
-							<th class="px-3 py-2 text-left font-display text-xs uppercase tracking-wide text-[var(--color-muted)]">{t('lol.historyWinRate')}</th>
 							<th class="px-3 py-2 text-left font-display text-xs uppercase tracking-wide text-[var(--color-muted)]">{t('lol.kdaLabel')}</th>
 							<th class="px-3 py-2 text-left font-display text-xs uppercase tracking-wide text-[var(--color-muted)]">{t('lol.winsLabel')}</th>
 						</tr>
@@ -771,14 +770,6 @@
 								</td>
 								<td class="whitespace-nowrap px-3 py-2 text-sm tabular-nums text-[var(--color-text)]">
 									{tot ? tot.matches : '-'}
-								</td>
-								<td class="whitespace-nowrap px-3 py-2">
-									{#if tot}
-										<span class="font-display text-sm tabular-nums text-[var(--color-brand-bright)]">{lolWinRate(tot)}%</span>
-										<span class="ml-1 text-xs tabular-nums text-[var(--color-muted)]">{tot.wins}/{tot.matches - tot.wins}</span>
-									{:else}
-										<span class="text-sm text-[var(--color-muted)]">-</span>
-									{/if}
 								</td>
 								<td class="whitespace-nowrap px-3 py-2 text-sm tabular-nums text-[var(--color-text)]">
 									{tot ? lolKda(tot).toFixed(1) : '-'}

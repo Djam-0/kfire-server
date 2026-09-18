@@ -76,11 +76,6 @@ export function flexRank(p: { data: LolProfile }): LolRank | undefined {
 	return p.data.ranks.find((r) => r.queue === FLEX_QUEUE);
 }
 
-/** Win rate over the whole stored history, as a whole percentage. */
-export function lolWinRate(t: LolTotals): number {
-	return t.matches > 0 ? Math.round((t.wins * 100) / t.matches) : 0;
-}
-
 /**
  * Average KDA, deaths counted as one when there are none.
  *

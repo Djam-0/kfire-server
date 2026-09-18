@@ -487,7 +487,10 @@
 					<div class="mt-3 border-t border-[var(--color-border)] pt-3">
 						<p class="mb-2 text-xs uppercase tracking-wide text-[var(--color-muted)]">{t('lol.recent')}</p>
 						<ul class="flex flex-col gap-1">
-							{#each detail.lol_recent as m (m.match_id)}
+							<!-- Ten, like the Hearthstone block right above: the endpoint
+							     returns forty, but forty unbroken rows in a section drawn for
+							     a handful reads as a wall rather than as recent form. -->
+							{#each detail.lol_recent.slice(0, 10) as m (m.match_id)}
 								<li class="flex items-center justify-between gap-2 text-sm">
 									<span class="font-display {m.win ? 'text-[var(--color-online)]' : 'text-[var(--color-magenta)]'}">
 										{m.win ? t('lol.win') : t('lol.loss')}
