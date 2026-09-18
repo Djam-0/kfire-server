@@ -19,6 +19,7 @@ export const fr: Catalog = {
 		leaderboards: 'Classements',
 		games: 'Jeux',
 		live: 'Jeux en live',
+		recap: 'Bilan de session',
 		download: "Obtenir l'app",
 		admin: 'Admin',
 		account: 'Compte'
@@ -95,6 +96,45 @@ export const fr: Catalog = {
 		heading: 'Jeux en live',
 		empty: 'Personne ne joue en ce moment.',
 		unknownMember: 'Un membre'
+	},
+	recap: {
+		title: 'Bilan de session',
+		subtitle: 'Choisissez une plage et voyez ce que la guilde y a joué.',
+		from: 'Début',
+		to: 'Fin',
+		apply: 'Afficher',
+		loading: 'Chargement du bilan...',
+		empty: 'Aucun match rapporté sur cette plage.',
+		totalMatches: '{count} matchs rapportés',
+		summary: 'Bilan',
+		timeline: 'Chronologie',
+		ownerNote: 'Chaque ligne nomme le membre dont provient le match, et rien d’autre.',
+		member: 'Membre',
+		matches: 'Matchs',
+		record: 'V-D-N',
+		time: 'Heure',
+		game: 'Jeu',
+		detail: 'Détail',
+		noDetail: 'Pas encore de détail pour ce jeu.',
+		none: 'n.c.',
+		rl: {
+			goals: 'Buts',
+			assists: 'Passes',
+			saves: 'Arrêts',
+			shots: 'Tirs',
+			demos: 'Démos',
+			mvps: 'MVP',
+			score: 'Score',
+			playTime: 'Temps joué'
+		},
+		hs: {
+			ranked: 'Classées',
+			avgPlacement: 'Position moy.',
+			top4: 'Top 4',
+			hero: 'Héros',
+			turns: 'Tours',
+			placement: 'Position'
+		}
 	},
 	profile: {
 		loading: 'Chargement...',
