@@ -21,7 +21,10 @@ export const en = {
 		recap: 'Session recap',
 		download: 'Get the app',
 		admin: 'Admin',
-		account: 'Account'
+		account: 'Account',
+		userMenu: 'Account menu',
+		openMenu: 'Open menu',
+		closeMenu: 'Close menu'
 	},
 	footer: {
 		org: 'Knights of Eternity',
