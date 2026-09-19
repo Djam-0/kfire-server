@@ -22,7 +22,10 @@ export const fr: Catalog = {
 		recap: 'Bilan de session',
 		download: "Obtenir l'app",
 		admin: 'Admin',
-		account: 'Compte'
+		account: 'Compte',
+		userMenu: 'Menu du compte',
+		openMenu: 'Ouvrir le menu',
+		closeMenu: 'Fermer le menu'
 	},
 	footer: {
 		org: 'Knights of Eternity',
