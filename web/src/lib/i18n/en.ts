@@ -100,7 +100,11 @@ export const en = {
 		mode: 'Mode',
 		elapsed: 'Elapsed',
 		hsTurn: 'Turn',
-		hsPlacement: 'Placement'
+		hsPlacement: 'Placement',
+		lolLevel: 'Level',
+		lolKda: 'KDA',
+		lolCreeps: 'Creeps',
+		lolGold: 'Gold'
 	},
 	recap: {
 		title: 'Session recap',
