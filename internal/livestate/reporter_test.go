@@ -5,6 +5,7 @@ import (
 	"errors"
 	"strings"
 	"testing"
+	"time"
 )
 
 // fake est un rapporteur de test qui note ce qu'on lui a passé.
@@ -13,9 +14,12 @@ type fake struct {
 	err    error
 	out    map[string]any
 	gotRaw string
+	ttl    time.Duration
 }
 
 func (f *fake) Slug() string { return f.slug }
+
+func (f *fake) TTL() time.Duration { return f.ttl }
 
 func (f *fake) Shape(raw json.RawMessage) (map[string]any, error) {
 	f.gotRaw = string(raw)
@@ -128,5 +132,32 @@ func TestRegistryRefusesAnEndSignalForAnUnknownGame(t *testing.T) {
 	reg := NewRegistry(&fake{slug: "rocket-league"})
 	if _, err := reg.Shape(json.RawMessage(`{"game_slug":"minecraft","ended":true}`)); !errors.Is(err, ErrUnknownGame) {
 		t.Errorf("Shape() = %v, want ErrUnknownGame", err)
+	}
+}
+
+// La durée déclarée par un jeu doit arriver jusqu'à l'état, sinon elle ne sert
+// à rien : c'est elle qui empêche une source lente d'être balayée en pleine
+// partie. Bug remonté le 2026-09-21 sur Hearthstone, dont la carte disparaissait
+// de la page de la guilde pendant la phase d'achat.
+func TestLaDureeDuRapporteurArriveDansLEtat(t *testing.T) {
+	r := &fake{slug: "un-jeu", out: map[string]any{"tour": 3}, ttl: 2 * time.Minute}
+	reg := NewRegistry(r)
+
+	st, err := reg.Shape([]byte(`{"game_slug":"un-jeu","tour":3}`))
+	if err != nil {
+		t.Fatalf("Shape: %v", err)
+	}
+	if st.TTL != 2*time.Minute {
+		t.Fatalf("TTL %v, attendu 2m : une source lente sera balayée en pleine partie", st.TTL)
+	}
+
+	// Et zéro veut dire « le défaut », pas « expire tout de suite ».
+	r2 := &fake{slug: "rapide", out: map[string]any{"score": 1}}
+	st2, err := NewRegistry(r2).Shape([]byte(`{"game_slug":"rapide","score":1}`))
+	if err != nil {
+		t.Fatalf("Shape: %v", err)
+	}
+	if st2.TTL != 0 {
+		t.Fatalf("TTL %v, attendu 0 pour retomber sur le défaut", st2.TTL)
 	}
 }

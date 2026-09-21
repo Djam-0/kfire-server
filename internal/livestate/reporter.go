@@ -54,6 +54,19 @@ type Reporter interface {
 	// under a slug the registry itself controls. That is the one hole this
 	// package cannot close for you, so it is stated rather than assumed.
 	Shape(raw json.RawMessage) (map[string]any, error)
+
+	// TTL is how long a state of this game stays trustworthy without a fresh
+	// sample. Zero means the package default.
+	//
+	// The source declares it because only the source knows its own rhythm, and
+	// the rhythms differ by two orders of magnitude. Rocket League pushes twice
+	// a second. Hearthstone re-reads a log file every five seconds AND only
+	// sends when something changed, so during a Battlegrounds shopping and
+	// combat phase it can legitimately say nothing for a minute. Judged by a
+	// default sized for the fastest source, the slower one is swept away
+	// mid-game and its card vanishes from the whole guild's screen, then comes
+	// back at the next turn. That is what this method exists to prevent.
+	TTL() time.Duration
 }
 
 // State is one validated live state, ready to broadcast.
@@ -138,5 +151,5 @@ func (r *Registry) Shape(raw json.RawMessage) (State, error) {
 	if err != nil || len(out) > MaxPayload {
 		return State{}, ErrInvalidLive
 	}
-	return State{Slug: e.GameSlug, Match: match}, nil
+	return State{Slug: e.GameSlug, Match: match, TTL: rep.TTL()}, nil
 }

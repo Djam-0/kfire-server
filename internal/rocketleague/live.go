@@ -2,6 +2,7 @@ package rocketleague
 
 import (
 	"encoding/json"
+	"time"
 
 	"github.com/knightsofeternity/kfire-server/internal/livestate"
 )
@@ -102,3 +103,7 @@ func (r *LiveReporter) Shape(raw json.RawMessage) (map[string]any, error) {
 		"demos":             p.Demos,
 	}, nil
 }
+
+// TTL uses the package default: this client pushes twice a second, which is
+// what that default was sized for.
+func (r *LiveReporter) TTL() time.Duration { return 0 }

@@ -2,6 +2,7 @@ package hearthstone
 
 import (
 	"encoding/json"
+	"time"
 
 	"github.com/knightsofeternity/kfire-server/internal/livestate"
 )
@@ -110,3 +111,20 @@ func (r *LiveReporter) Shape(raw json.RawMessage) (map[string]any, error) {
 	}
 	return out, nil
 }
+
+// liveTTL is how long a Hearthstone state stays trustworthy without a fresh
+// sample.
+//
+// Generous on purpose. The desktop client re-reads the game's log every five
+// seconds and only sends when something changed, and in Battlegrounds nothing
+// changes during the shopping and combat phases: a turn can legitimately hold
+// for a minute. With the package default, sized for a client pushing twice a
+// second, the card vanished from the guild's live page mid-game and came back
+// at the next turn. A member reported exactly that.
+//
+// Two minutes is longer than any silence a real game produces, and still short
+// enough that a client which crashes or is closed stops being shown quickly.
+const liveTTL = 2 * time.Minute
+
+// TTL reports how long this game's state survives without a new sample.
+func (r *LiveReporter) TTL() time.Duration { return liveTTL }
