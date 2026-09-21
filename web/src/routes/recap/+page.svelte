@@ -361,10 +361,9 @@
 
 		<!-- Timeline: every game merged, oldest first, exactly as the server sent
 		     it. Each line names the member the match came from, and only them. -->
-		<h2 class="pd-heading mt-6 mb-1 text-sm text-[var(--color-brand-bright)]">
+		<h2 class="pd-heading mt-6 mb-3 text-sm text-[var(--color-brand-bright)]">
 			{t('recap.timeline')}
 		</h2>
-		<p class="mb-3 text-xs text-[var(--color-muted)]">{t('recap.ownerNote')}</p>
 		<div class="pd-card overflow-x-auto">
 			<table class="w-full min-w-[680px] border-collapse">
 				<thead>

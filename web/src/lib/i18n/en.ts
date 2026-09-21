@@ -121,7 +121,6 @@ export const en = {
 		totalMatches: '{count} matches reported',
 		summary: 'Summary',
 		timeline: 'Timeline',
-		ownerNote: 'Each line names the member the match came from, and nothing else.',
 		member: 'Member',
 		matches: 'Matches',
 		record: 'W-L-D',

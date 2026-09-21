@@ -122,7 +122,6 @@ export const fr: Catalog = {
 		totalMatches: '{count} matchs rapportés',
 		summary: 'Bilan',
 		timeline: 'Chronologie',
-		ownerNote: 'Chaque ligne nomme le membre dont provient le match, et rien d’autre.',
 		member: 'Membre',
 		matches: 'Matchs',
 		record: 'V-D-N',
