@@ -443,6 +443,18 @@ func (c *client) handleGameEvent(h *Hub, env Envelope, started bool) {
 		return
 	}
 
+	// A hidden game is one an admin has declared not to be a game: a test
+	// server, or an entry the catalogue misdetects. Letting it OPEN a session
+	// would show the member "in game" on a driver updater or an overlay, which
+	// is the most visible symptom of the very thing hiding is meant to fix.
+	//
+	// Closing is still allowed, and that asymmetry is deliberate: a session
+	// opened before the game was hidden must still be closable, or the member
+	// would stay shown in game forever.
+	if started && game.Hidden {
+		return
+	}
+
 	var changed bool
 	if started {
 		changed, err = h.store.StartSession(ctx, c.userID, game.ID, "client")
