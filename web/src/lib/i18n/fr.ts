@@ -225,7 +225,7 @@ export const fr: Catalog = {
 		hsWins: 'Victoires',
 		hsAvgPlacement: 'Position moyenne',
 		hsTop4: 'Top 4',
-		hsNoPlacement: 'Aucune partie de Bataille de Champions',
+		hsNoPlacement: 'Aucune partie de Champs de bataille',
 		hsSpread: 'Répartition des positions',
 		hsTrend: 'Tendance',
 		hsTrendCaption:
@@ -243,7 +243,7 @@ export const fr: Catalog = {
 		hsModeConstructed: 'Construit',
 		hsModeArena: 'Arène',
 		hsRatingNote:
-			"La cote de Bataille de Champions n'est pas inscrite dans les journaux du jeu, KFIRE mesure donc le niveau par la position moyenne et le taux de top 4.",
+			"La cote de Champs de bataille n'est pas inscrite dans les journaux du jeu, KFIRE mesure donc le niveau par la position moyenne et le taux de top 4.",
 		rlRecord: 'Bilan Rocket League',
 		rlPlayers: 'Membres qui remontent',
 		rlMatches: 'Matchs',
