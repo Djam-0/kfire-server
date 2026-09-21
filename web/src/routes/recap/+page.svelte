@@ -16,6 +16,7 @@
 		type RecapGameBlock,
 		type RecapHsEntry,
 		type RecapHsMember,
+		type RecapMember,
 		type RecapRlEntry,
 		type RecapRlMember
 	} from '$lib/api';
@@ -111,17 +112,38 @@
 		toInput = toLocalInput(new Date(rangeTo));
 	});
 
+	// The two filters live in the URL for the same reason the bounds do: a link
+	// to "Wednesday evening, Rocket League only" has to reopen on exactly that.
+	// They hold ids rather than names, which survive a member renaming himself.
+	const gameFilter = $derived(page.url.searchParams.get('game') ?? '');
+	const memberFilter = $derived(page.url.searchParams.get('member') ?? '');
+	const filterActive = $derived(gameFilter !== '' || memberFilter !== '');
+
 	// Pin the default into the URL so that even an untouched recap is a link
 	// worth sharing. Replaces rather than pushes: it is the same view, not a
 	// step the reader took.
 	$effect(() => {
 		if (!page.url.searchParams.get('from') || !page.url.searchParams.get('to')) {
-			goto(rangeHref(fallbackRange), { replaceState: true, keepFocus: true, noScroll: true });
+			goto(viewHref(fallbackRange, gameFilter, memberFilter), {
+				replaceState: true,
+				keepFocus: true,
+				noScroll: true
+			});
 		}
 	});
 
-	function rangeHref(r: Range): string {
-		return `/recap?from=${encodeURIComponent(r.from)}&to=${encodeURIComponent(r.to)}`;
+	/**
+	 * The whole view as one address: window plus filters.
+	 *
+	 * Every navigation goes through here so that moving one of the three never
+	 * drops the other two, which is what would make a shared link reopen on a
+	 * view nobody meant.
+	 */
+	function viewHref(r: Range, game: string, member: string): string {
+		const params = new URLSearchParams({ from: r.from, to: r.to });
+		if (game) params.set('game', game);
+		if (member) params.set('member', member);
+		return `/recap?${params.toString()}`;
 	}
 
 	function applyRange(event: SubmitEvent) {
@@ -131,7 +153,14 @@
 		// An incomplete field is already refused by the input itself; there is
 		// nothing useful to say that the browser has not said.
 		if (!start || !end) return;
-		goto(rangeHref({ from: start.toISOString(), to: end.toISOString() }), {
+		const r = { from: start.toISOString(), to: end.toISOString() };
+		goto(viewHref(r, gameFilter, memberFilter), { keepFocus: true, noScroll: true });
+	}
+
+	// Filters take effect as they are picked, without going through the range
+	// form's button: nothing is fetched, so there is nothing to confirm.
+	function applyFilters(game: string, member: string) {
+		goto(viewHref({ from: rangeFrom, to: rangeTo }, game, member), {
 			keepFocus: true,
 			noScroll: true
 		});
@@ -167,6 +196,65 @@
 				if (seq === requestSeq) loading = false;
 			});
 	});
+
+	// Both lists are read off the answer that came back, never off a fixed
+	// catalogue: offering a game nobody touched that evening would be a dead
+	// end, and the reader would blame the page rather than the choice.
+	const gameOptions = $derived(recap?.games ?? []);
+
+	const memberOptions = $derived.by((): RecapMember[] => {
+		const seen = new Map<string, RecapMember>();
+		for (const block of recap?.games ?? []) {
+			for (const m of block.members) if (!seen.has(m.user_id)) seen.set(m.user_id, m);
+		}
+		return [...seen.values()].sort((a, b) => a.username.localeCompare(b.username));
+	});
+
+	const gameFilterName = $derived(
+		gameOptions.find((b) => b.game_id === gameFilter)?.game_name ?? gameFilter
+	);
+	const memberFilterName = $derived(
+		memberOptions.find((m) => m.user_id === memberFilter)?.username ?? memberFilter
+	);
+
+	const timeline = $derived(
+		(recap?.timeline ?? []).filter(
+			(e) =>
+				(gameFilter === '' || e.game_id === gameFilter) &&
+				(memberFilter === '' || e.user_id === memberFilter)
+		)
+	);
+
+	/**
+	 * The summary, cut down to what the timeline still shows.
+	 *
+	 * The per-game count is recounted off the filtered timeline instead of
+	 * being summed from the member rows: a game this portal has no columns for
+	 * carries rows without any count at all, while the timeline holds one line
+	 * per match whatever the game. Both halves of the page then rest on the
+	 * same measure and cannot contradict each other.
+	 */
+	const gameBlocks = $derived.by((): RecapGameBlock[] => {
+		if (!recap) return [];
+		if (!filterActive) return recap.games;
+		const counts = new Map<string, number>();
+		for (const e of timeline) counts.set(e.game_id, (counts.get(e.game_id) ?? 0) + 1);
+		return recap.games
+			.filter((b) => counts.has(b.game_id))
+			.map((b) => ({
+				...b,
+				matches: counts.get(b.game_id) ?? 0,
+				// A member row already counts that member alone over the window, so
+				// only the rows themselves are dropped, never their figures.
+				members:
+					memberFilter === '' ? b.members : b.members.filter((m) => m.user_id === memberFilter)
+			}));
+	});
+
+	// Unfiltered, the server's own total is kept rather than the timeline
+	// length: they agree today, and the figure the server computed is the one
+	// to trust if they ever stop agreeing.
+	const shownMatches = $derived(filterActive ? timeline.length : (recap?.total_matches ?? 0));
 
 	// The summary rows and the timeline entries carry a shape that depends on
 	// the game, and the payload says which only through `game_slug`. These are
@@ -214,6 +302,7 @@
 	const numberClass = 'px-3 py-2 whitespace-nowrap text-sm tabular-nums';
 	const inputClass =
 		'mt-1 w-full border border-[var(--color-border)] bg-[var(--color-bg)] px-3 py-2 text-sm text-[var(--color-text)] outline-none focus:border-[var(--color-brand)]';
+	const selectClass = `${inputClass} pd-cut-sm`;
 </script>
 
 <h1 class="pd-heading mb-1 text-2xl text-[var(--color-brand-bright)]">{t('recap.title')}</h1>
@@ -231,6 +320,70 @@
 	<button type="submit" class="btn-pd shrink-0 px-4 py-2 text-sm">{t('recap.apply')}</button>
 </form>
 
+<!-- Two lists rather than rows of chips: the page is already dense and the
+     date fields own the top of it, so the filters have to cost one line on a
+     phone. They sit below the range because they narrow its answer. -->
+<div class="mb-4 flex flex-col gap-3 sm:flex-row sm:items-end">
+	<label class="flex-1 text-xs text-[var(--color-muted)]" for="recap-game">
+		{t('recap.filterGame')}
+		<select
+			id="recap-game"
+			value={gameFilter}
+			onchange={(e) => applyFilters(e.currentTarget.value, memberFilter)}
+			class={selectClass}
+		>
+			<option value="">{t('recap.allGames')}</option>
+			{#each gameOptions as block (block.game_id)}
+				<option value={block.game_id}>{block.game_name}</option>
+			{/each}
+		</select>
+	</label>
+	<label class="flex-1 text-xs text-[var(--color-muted)]" for="recap-member">
+		{t('recap.filterMember')}
+		<select
+			id="recap-member"
+			value={memberFilter}
+			onchange={(e) => applyFilters(gameFilter, e.currentTarget.value)}
+			class={selectClass}
+		>
+			<option value="">{t('recap.allMembers')}</option>
+			{#each memberOptions as m (m.user_id)}
+				<option value={m.user_id}>{m.username}</option>
+			{/each}
+		</select>
+	</label>
+</div>
+
+{#if filterActive}
+	<!-- Somebody opening a shared link has to see at a glance that the page is
+	     holding something back, without reading the two lists, and has to find
+	     the way out in the same place. -->
+	<div class="mb-5 flex flex-wrap items-center gap-2 text-xs">
+		<span class="text-[var(--color-muted)]">{t('recap.filtering')}</span>
+		{#if gameFilter}
+			<span
+				class="pd-cut-sm border border-[var(--color-brand)] px-2 py-1 text-[var(--color-brand-bright)]"
+			>
+				{gameFilterName}
+			</span>
+		{/if}
+		{#if memberFilter}
+			<span
+				class="pd-cut-sm border border-[var(--color-brand)] px-2 py-1 text-[var(--color-brand-bright)]"
+			>
+				{memberFilterName}
+			</span>
+		{/if}
+		<button
+			type="button"
+			onclick={() => applyFilters('', '')}
+			class="pd-cut-sm border border-[var(--color-border)] px-2 py-1 text-[var(--color-muted)] hover:border-[var(--color-brand)] hover:text-[var(--color-text)]"
+		>
+			{t('recap.clearFilters')}
+		</button>
+	</div>
+{/if}
+
 {#if errorMessage}
 	<p class="text-sm text-[var(--color-magenta)]">{errorMessage}</p>
 {:else if loading && !recap}
@@ -238,15 +391,21 @@
 {:else if recap}
 	{#if recap.total_matches === 0}
 		<p class="text-[var(--color-muted)]">{t('recap.empty')}</p>
+	{:else if timeline.length === 0}
+		<!-- A different sentence from the one above, because the two say opposite
+		     things: nobody played, versus the filter hides everybody who did.
+		     Reading the second as the first would make a busy evening look dead
+		     and nobody would think of clearing the filter. -->
+		<p class="text-[var(--color-muted)]">{t('recap.emptyFiltered')}</p>
 	{:else}
 		<p class="mb-5 text-sm text-[var(--color-muted)] tabular-nums">
-			{t('recap.totalMatches', { count: recap.total_matches })}
+			{t('recap.totalMatches', { count: shownMatches })}
 		</p>
 
 		<!-- Summary: one block per game, then one line per member inside it. No
 		     column is shared between games that have nothing in common. -->
 		<h2 class="pd-heading mb-3 text-sm text-[var(--color-brand-bright)]">{t('recap.summary')}</h2>
-		{#each recap.games as block (block.game_id)}
+		{#each gameBlocks as block (block.game_id)}
 			{@const rl = rlMembers(block)}
 			{@const hs = hsMembers(block)}
 			<section class="mb-5">
@@ -375,7 +534,7 @@
 					</tr>
 				</thead>
 				<tbody>
-					{#each recap.timeline as entry, i (i)}
+					{#each timeline as entry, i (i)}
 						{@const rl = rlEntry(entry)}
 						{@const hs = hsEntry(entry)}
 						<tr
