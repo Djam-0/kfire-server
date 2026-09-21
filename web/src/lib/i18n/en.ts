@@ -111,6 +111,7 @@ export const en = {
 		lolGold: 'Gold'
 	},
 	recap: {
+		filterStale: 'outside this range',
 		title: 'Session recap',
 		subtitle: 'Pick a range and see what the guild played during it.',
 		from: 'Start',

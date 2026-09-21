@@ -112,6 +112,7 @@ export const fr: Catalog = {
 		lolGold: 'Or'
 	},
 	recap: {
+		filterStale: 'hors de cette plage',
 		title: 'Bilan de session',
 		subtitle: 'Choisissez une plage et voyez ce que la guilde y a joué.',
 		from: 'Début',

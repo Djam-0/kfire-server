@@ -210,11 +210,16 @@
 		return [...seen.values()].sort((a, b) => a.username.localeCompare(b.username));
 	});
 
+	// A filter kept across a range change can point at a game or a member absent
+	// from the new range. The filter is NOT cleared on its own, because that
+	// would silently rewrite a link somebody shared. But the chip must not fall
+	// back to the raw id: a uuid on screen tells the reader nothing and looks
+	// broken. It says the filter no longer matches, which is what happened.
 	const gameFilterName = $derived(
-		gameOptions.find((b) => b.game_id === gameFilter)?.game_name ?? gameFilter
+		gameOptions.find((b) => b.game_id === gameFilter)?.game_name ?? t('recap.filterStale')
 	);
 	const memberFilterName = $derived(
-		memberOptions.find((m) => m.user_id === memberFilter)?.username ?? memberFilter
+		memberOptions.find((m) => m.user_id === memberFilter)?.username ?? t('recap.filterStale')
 	);
 
 	const timeline = $derived(
