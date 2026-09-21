@@ -100,7 +100,11 @@ func (s *Store) LatestOpenSession(ctx context.Context, userID string) (*Session,
 		SELECT s.id, s.user_id, s.source, s.started_at,
 		       g.id, g.name, g.slug, g.executable_names, g.platform, g.icon_url
 		FROM game_sessions s
-		JOIN games g ON g.id = s.game_id
+		-- A hidden game never makes someone "in game": an inner join drops the
+		-- row entirely, so the caller sees no open session and the member shows
+		-- as online. This also covers sessions opened BEFORE the game was
+		-- hidden, which the hub's own guard cannot reach.
+		JOIN games g ON g.id = s.game_id AND NOT g.hidden
 		WHERE s.user_id = $1 AND s.ended_at IS NULL
 		ORDER BY s.started_at DESC
 		LIMIT 1`, userID)
@@ -141,7 +145,11 @@ func (s *Store) ListPresence(ctx context.Context) ([]PresenceRow, error) {
 		       s.started_at
 		FROM users u
 		LEFT JOIN game_sessions s ON s.user_id = u.id AND s.ended_at IS NULL
-		LEFT JOIN games g ON g.id = s.game_id
+		-- NOT g.hidden lives in the JOIN and not in the WHERE on purpose: it must
+		-- drop the GAME, never the member. In the WHERE it would remove the row
+		-- entirely and the member would vanish from presence instead of simply
+		-- showing as online.
+		LEFT JOIN games g ON g.id = s.game_id AND NOT g.hidden
 		WHERE u.banned_at IS NULL
 		ORDER BY u.id, s.started_at DESC`)
 	if err != nil {
