@@ -23,6 +23,7 @@
 	import { HS_SLUG, heroName, hsModeLabel } from '$lib/hearthstone';
 	import { RL_SLUG, rlModeLabel, rlSideScore } from '$lib/rocketleague';
 	import Avatar from '$lib/components/Avatar.svelte';
+	import HsResult from '$lib/components/HsResult.svelte';
 	import { t } from '$lib/i18n';
 
 	type Range = { from: string; to: string };
@@ -421,22 +422,13 @@
 										</span>
 									</div>
 								{:else if hs}
-									{@const info = resultInfo(hs.result)}
 									<div class="flex flex-wrap items-center gap-x-3 gap-y-1">
-										<span class="font-display font-bold {info.colorClass}">{info.label}</span>
+										<!-- No separate placement chip: in Battlegrounds the result IS
+										     the placement, so the chip would repeat it word for word. -->
+										<HsResult mode={hs.mode} result={hs.result} placement={hs.placement} />
 										<span class="text-xs text-[var(--color-muted)]">{hsModeLabel(hs.mode)}</span>
 										{#if hs.hero_card_id}
 											<span class="text-xs">{heroName(hs.hero_card_id)}</span>
-										{/if}
-										{#if hs.placement !== null}
-											<span
-												class="text-xs tabular-nums {hs.placement <= 4
-													? 'text-[var(--color-brand-bright)]'
-													: 'text-[var(--color-muted)]'}"
-											>
-												{t('recap.hs.placement')}
-												{hs.placement}
-											</span>
 										{/if}
 										{#if hs.turns !== null}
 											<span class="text-xs text-[var(--color-muted)] tabular-nums">

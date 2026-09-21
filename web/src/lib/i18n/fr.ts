@@ -146,8 +146,7 @@ export const fr: Catalog = {
 			avgPlacement: 'Position moy.',
 			top4: 'Top 4',
 			hero: 'Héros',
-			turns: 'Tours',
-			placement: 'Position'
+			turns: 'Tours'
 		}
 	},
 	profile: {
@@ -234,6 +233,10 @@ export const fr: Catalog = {
 			'Position moyenne sur les 20 dernières parties ; la courbe monte quand les positions baissent, donc plus haut vaut mieux.',
 		hsRecentMatches: 'Dernières parties',
 		hsPlacement: 'Position',
+		hsTop: 'Top {n}',
+		hsWin: 'Victoire',
+		hsLoss: 'Défaite',
+		hsDraw: 'Égalité',
 		hsHero: 'Héros',
 		hsTurns: 'Tours',
 		hsDate: 'Date',

@@ -145,8 +145,7 @@ export const en = {
 			avgPlacement: 'Avg. place',
 			top4: 'Top 4',
 			hero: 'Hero',
-			turns: 'Turns',
-			placement: 'Place'
+			turns: 'Turns'
 		}
 	},
 	profile: {
@@ -233,6 +232,10 @@ export const en = {
 			'Average placement over the last 20 matches; the line rises as placements drop, so higher is better.',
 		hsRecentMatches: 'Recent matches',
 		hsPlacement: 'Placement',
+		hsTop: 'Top {n}',
+		hsWin: 'Victory',
+		hsLoss: 'Defeat',
+		hsDraw: 'Draw',
 		hsHero: 'Hero',
 		hsTurns: 'Turns',
 		hsDate: 'Date',

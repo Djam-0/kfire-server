@@ -50,6 +50,59 @@ export function hsModeLabel(mode: string): string {
 	return key ? t(key) : mode;
 }
 
+/** The Battlegrounds mode, the only one that finishes on a placement. */
+const HS_BATTLEGROUNDS = 'battlegrounds';
+
+/** The places players themselves count as a good game, the game's own top 4. */
+const HS_TOP_PLACES = 4;
+
+/** How one match reads on screen: its label, its accent, and the crown. */
+export type HsResultInfo = {
+	label: string;
+	colorClass: string;
+	/** First place only: a lobby of eight has exactly one winner. */
+	crown: boolean;
+};
+
+/**
+ * How a finished Hearthstone match reads on screen.
+ *
+ * Battlegrounds has no win or loss, it has a place out of eight, and the game's
+ * own PLAYSTATE says WON for a first place only. That is why a top 2 used to
+ * show up as a red "Defeat": the stored result is exact, it just is not what
+ * the mode means. In Battlegrounds the placement IS the result, and it carries
+ * three levels rather than two, because finishing first and finishing fourth
+ * are not the same thing to the player who did it.
+ *
+ * Constructed keeps win, loss and draw: there the words mean something.
+ *
+ * A Battlegrounds match whose log carried no placement falls back to the stored
+ * result, imprecise but never empty: the game's log is not always complete.
+ */
+export function hsResultInfo(
+	mode: string,
+	result: string,
+	placement?: number | null
+): HsResultInfo {
+	if (mode === HS_BATTLEGROUNDS && typeof placement === 'number') {
+		return {
+			label: t('game.hsTop', { n: placement }),
+			colorClass:
+				placement === 1
+					? 'text-[var(--color-gold)]'
+					: placement <= HS_TOP_PLACES
+						? 'text-[var(--color-online)]'
+						: 'text-[var(--color-magenta)]',
+			crown: placement === 1
+		};
+	}
+	if (result === 'win')
+		return { label: t('game.hsWin'), colorClass: 'text-[var(--color-online)]', crown: false };
+	if (result === 'loss')
+		return { label: t('game.hsLoss'), colorClass: 'text-[var(--color-magenta)]', crown: false };
+	return { label: t('game.hsDraw'), colorClass: 'text-[var(--color-muted)]', crown: false };
+}
+
 /**
  * Win rate across every reported match, as a whole percentage.
  * Zero matches yields 0 rather than a division by zero.
