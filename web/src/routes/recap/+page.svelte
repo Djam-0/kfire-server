@@ -354,10 +354,11 @@
 	</label>
 </div>
 
-{#if filterActive}
+{#if filterActive && recap}
 	<!-- Somebody opening a shared link has to see at a glance that the page is
 	     holding something back, without reading the two lists, and has to find
-	     the way out in the same place. -->
+	     the way out in the same place. Held back until the answer is in, since
+	     until then the names behind the ids are not known. -->
 	<div class="mb-5 flex flex-wrap items-center gap-2 text-xs">
 		<span class="text-[var(--color-muted)]">{t('recap.filtering')}</span>
 		{#if gameFilter}
