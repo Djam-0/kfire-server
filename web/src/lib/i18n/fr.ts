@@ -122,7 +122,6 @@ export const fr: Catalog = {
 		totalMatches: '{count} matchs rapportés',
 		summary: 'Bilan',
 		timeline: 'Chronologie',
-		ownerNote: 'Chaque ligne nomme le membre dont provient le match, et rien d’autre.',
 		member: 'Membre',
 		matches: 'Matchs',
 		record: 'V-D-N',
@@ -146,8 +145,7 @@ export const fr: Catalog = {
 			avgPlacement: 'Position moy.',
 			top4: 'Top 4',
 			hero: 'Héros',
-			turns: 'Tours',
-			placement: 'Position'
+			turns: 'Tours'
 		}
 	},
 	profile: {
@@ -227,13 +225,17 @@ export const fr: Catalog = {
 		hsWins: 'Victoires',
 		hsAvgPlacement: 'Position moyenne',
 		hsTop4: 'Top 4',
-		hsNoPlacement: 'Aucune partie de Bataille de Champions',
+		hsNoPlacement: 'Aucune partie de Champs de bataille',
 		hsSpread: 'Répartition des positions',
 		hsTrend: 'Tendance',
 		hsTrendCaption:
 			'Position moyenne sur les 20 dernières parties ; la courbe monte quand les positions baissent, donc plus haut vaut mieux.',
 		hsRecentMatches: 'Dernières parties',
 		hsPlacement: 'Position',
+		hsTop: 'Top {n}',
+		hsWin: 'Victoire',
+		hsLoss: 'Défaite',
+		hsDraw: 'Égalité',
 		hsHero: 'Héros',
 		hsTurns: 'Tours',
 		hsDate: 'Date',
@@ -241,7 +243,7 @@ export const fr: Catalog = {
 		hsModeConstructed: 'Construit',
 		hsModeArena: 'Arène',
 		hsRatingNote:
-			"La cote de Bataille de Champions n'est pas inscrite dans les journaux du jeu, KFIRE mesure donc le niveau par la position moyenne et le taux de top 4.",
+			"La cote de Champs de bataille n'est pas inscrite dans les journaux du jeu, KFIRE mesure donc le niveau par la position moyenne et le taux de top 4.",
 		rlRecord: 'Bilan Rocket League',
 		rlPlayers: 'Membres qui remontent',
 		rlMatches: 'Matchs',

@@ -14,6 +14,7 @@
 		hsTrend
 	} from '$lib/hearthstone';
 	import { rlModeLabel, rlSideScore } from '$lib/rocketleague';
+	import HsResult from '$lib/components/HsResult.svelte';
 
 	let detail = $state<PlayerGameDetail | null>(null);
 	let loading = $state(true);
@@ -669,9 +670,7 @@
 									</td>
 									<td class="px-3 py-2 whitespace-nowrap text-sm tabular-nums">
 										{#if m.placement !== undefined}
-											<span class={m.placement <= 4 ? 'text-[var(--color-brand-bright)]' : 'text-[var(--color-muted)]'}>
-												{m.placement}
-											</span>
+											<HsResult mode={m.mode} result={m.result} placement={m.placement} class="text-sm" />
 										{:else}
 											<!-- A constructed game has no placement; naming the mode beats an empty cell -->
 											<span class="text-xs italic text-[var(--color-muted)]">{hsModeLabel(m.mode)}</span>
