@@ -3,6 +3,7 @@ package riotsync
 import (
 	"encoding/json"
 	"regexp"
+	"time"
 
 	"github.com/knightsofeternity/kfire-server/internal/livestate"
 )
@@ -136,3 +137,8 @@ func (r *LiveReporter) Shape(raw json.RawMessage) (map[string]any, error) {
 		"game_time_seconds": p.GameTimeSeconds,
 	}, nil
 }
+
+// TTL uses the package default. Unlike the Spectator poller, which the server
+// drives once a minute and which sets its own, this state is pushed by the
+// member's client while the game runs.
+func (r *LiveReporter) TTL() time.Duration { return 0 }
