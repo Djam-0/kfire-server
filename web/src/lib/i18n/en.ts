@@ -98,6 +98,7 @@ export const en = {
 		heading: 'Live games',
 		empty: 'Nobody is playing right now.',
 		unknownMember: 'A member',
+		alsoPlaying: 'Also in game',
 		unknownChampion: 'Unknown champion',
 		badge: 'Live',
 		mode: 'Mode',
