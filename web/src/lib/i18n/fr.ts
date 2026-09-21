@@ -99,6 +99,7 @@ export const fr: Catalog = {
 		heading: 'Jeux en live',
 		empty: 'Personne ne joue en ce moment.',
 		unknownMember: 'Un membre',
+		alsoPlaying: 'Aussi en jeu',
 		unknownChampion: 'Champion inconnu',
 		badge: 'En direct',
 		mode: 'Mode',

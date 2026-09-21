@@ -5,6 +5,8 @@
 	// later. That is the design, not a gap to paper over.
 	import { liveMatches } from '$lib/stores/live.svelte';
 	import { presence } from '$lib/stores/presence.svelte';
+	import type { PresenceEntry } from '$lib/api';
+	import Avatar from '$lib/components/Avatar.svelte';
 	import { rlLiveMatch, type RlLiveMatch } from '$lib/rocketleague';
 	import { lolLiveMatch, type LolLiveMatch } from '$lib/lol';
 	import { hsLiveMatch, type HsLiveMatch } from '$lib/hearthstone';
@@ -54,13 +56,37 @@
 			})
 			.sort(byName)
 	);
+
+	let hasCards = $derived(rlCards.length > 0 || lolCards.length > 0 || hsCards.length > 0);
+
+	// The catalogue is far wider than the three games we draw a card for, so the
+	// page would claim nobody is playing while the presence store says otherwise.
+	// Members already shown above are excluded by user id: a card is the richer
+	// view of the same fact, and showing both would read as two players.
+	let carded = $derived(
+		new Set([...rlCards, ...lolCards, ...hsCards].map((card) => card.userId))
+	);
+
+	// `in_game` without a game happens (the client knows the session started
+	// before it has resolved what is running), and such an entry would render an
+	// anonymous line, so it is dropped rather than shown half-filled.
+	let alsoPlaying = $derived(
+		presence.list
+			.filter(
+				(m): m is PresenceEntry & { game: NonNullable<PresenceEntry['game']> } =>
+					m.status === 'in_game' && !!m.game && !carded.has(m.user_id)
+			)
+			.sort((a, b) => a.username.localeCompare(b.username) || a.user_id.localeCompare(b.user_id))
+	);
 </script>
 
 <h1 class="pd-heading mb-5 text-xl">{t('live.heading')}</h1>
 
-{#if rlCards.length === 0 && lolCards.length === 0 && hsCards.length === 0}
+{#if !hasCards && alsoPlaying.length === 0}
 	<p class="text-[var(--color-muted)]">{t('live.empty')}</p>
-{:else}
+{/if}
+
+{#if hasCards}
 	<div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
 		{#each rlCards as card (card.userId)}
 			<RocketLeagueCard username={card.username} match={card.match} />
@@ -72,4 +98,27 @@
 			<HearthstoneCard username={card.username} match={card.match} />
 		{/each}
 	</div>
+{/if}
+
+{#if alsoPlaying.length > 0}
+	<h2 class="pd-heading mb-3 text-xs text-[var(--color-muted)] {hasCards ? 'mt-8' : ''}">{t('live.alsoPlaying')}</h2>
+	<ul class="pd-card overflow-hidden">
+		{#each alsoPlaying as m (m.user_id)}
+			<li class="border-b border-[var(--color-border)] last:border-b-0">
+				<a
+					href="/players/{m.user_id}"
+					class="group flex items-center gap-3 px-4 py-2.5 transition-colors hover:bg-[var(--color-surface-2)]"
+				>
+					<Avatar username={m.username} url={m.avatar_url} size={28} />
+					<span class="flex-1 truncate text-sm font-semibold group-hover:text-[var(--color-brand-bright)]"
+						>{m.username}</span
+					>
+					{#if m.game.icon_url}
+						<img src={m.game.icon_url} alt="" class="pd-cut-sm h-5 w-5 shrink-0 object-cover" />
+					{/if}
+					<span class="truncate text-sm text-[var(--color-brand)]">{m.game.name}</span>
+				</a>
+			</li>
+		{/each}
+	</ul>
 {/if}
