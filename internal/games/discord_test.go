@@ -178,6 +178,22 @@ func TestNormalizeNeverRescuesInstallersOrAntiCheat(t *testing.T) {
 	}
 }
 
+// Les redistribuables existent sous deux orthographes, avec un point et avec un
+// tiret bas. Seule la première était filtrée, et la seconde a produit de vrais
+// faux positifs en production : trois membres « jouaient » à Orcs Must Die! 2
+// via vcredist_x86.exe, deux à Operation Flashpoint via l'installeur .NET.
+func TestNormalizeFiltreLesDeuxOrthographesDesRedistribuables(t *testing.T) {
+	apps := []detectableApp{
+		{ID: "a", Name: "Jeu A", Executables: exeList("jeu a/vcredist_x86.exe")},
+		{ID: "b", Name: "Jeu B", Executables: exeList("jeu b/vcredist_x64.exe")},
+		{ID: "c", Name: "Jeu C", Executables: exeList("jeu c/dotnetfx40_full_x86_x64.exe")},
+		{ID: "d", Name: "Jeu D", Executables: exeList("jeu d/vc_redist.x64.exe")},
+	}
+	if seeds := normalize(apps); len(seeds) != 0 {
+		t.Errorf("un redistribuable n'est jamais une partie, obtenu %d : %+v", len(seeds), seeds)
+	}
+}
+
 func TestNormalizeRescuesTooShortAndOversharedNamesWhenQualified(t *testing.T) {
 	apps := []detectableApp{
 		// Two-letter stem: unusable alone, fine once qualified.

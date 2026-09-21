@@ -83,6 +83,14 @@ var neverDetect = map[string]struct{}{
 	"ueprereqsetup_x64.exe": {}, "ue4prereqsetup_x64.exe": {}, "prerequisites.exe": {},
 	"tap.exe":           {},
 	"vc_redist.x64.exe": {}, "vc_redist.x86.exe": {}, "dxsetup.exe": {},
+	// The SAME redistributables under their other spelling. The dotted form
+	// above did not cover these, so "Orcs Must Die! 2" was matched on
+	// vcredist_x86.exe and "Operation Flashpoint: Red River" on the .NET
+	// installer: three members and two members were shown playing an installer.
+	// A redistributable ships with hundreds of games, so every match is a
+	// cross-attribution to whichever game happens to list it.
+	"vcredist_x86.exe": {}, "vcredist_x64.exe": {}, "vcredist.exe": {},
+	"dotnetfx40_full_x86_x64.exe": {}, "dotnetfx35setup.exe": {}, "dotnetfx.exe": {},
 	"setup.exe": {}, "setup_x64.exe": {}, "setup_x86.exe": {},
 	"install.exe": {}, "installer.exe": {}, "uninstall.exe": {}, "unins000.exe": {},
 	"update.exe": {}, "updater.exe": {}, "launcher_updater.exe": {}, "patcher.exe": {},
