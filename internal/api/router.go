@@ -68,7 +68,11 @@ func rateLimiter(max int) fiber.Handler {
 }
 
 // Register mounts every route on the Fiber app.
-func Register(app *fiber.App, cfg *config.Config, st *store.Store, hub *ws.Hub, steamConn *steam.Connector, syncer *steamsync.Syncer, cipher *crypto.Cipher) *riotsync.Syncer {
+// It returns the League syncer and the PUBG connector, both of which drive
+// background loops the caller starts. The PUBG connector is handed back rather
+// than rebuilt there because the quota belongs to the key: a second instance
+// would carry a second limiter and quietly allow twice the agreed rate.
+func Register(app *fiber.App, cfg *config.Config, st *store.Store, hub *ws.Hub, steamConn *steam.Connector, syncer *steamsync.Syncer, cipher *crypto.Cipher) (*riotsync.Syncer, *pubg.Connector) {
 	bnConn := battlenet.New(cfg.BattlenetClientID, cfg.BattlenetClientSecret)
 	if cfg.BattlenetOAuthBase != "" {
 		bnConn.OAuthBase = cfg.BattlenetOAuthBase
@@ -227,7 +231,7 @@ func Register(app *fiber.App, cfg *config.Config, st *store.Store, hub *ws.Hub, 
 	// Org logo (public: shown in the header and on the login screen).
 	app.Get("/img/org/logo", h.orgLogo)
 
-	return riotSync
+	return riotSync, pubgConn
 }
 
 func notImplemented(c *fiber.Ctx) error {

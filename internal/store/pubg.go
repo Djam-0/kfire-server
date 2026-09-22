@@ -195,3 +195,35 @@ func (s *Store) PubgLinkedMembers(ctx context.Context) ([]PubgPlayer, error) {
 	}
 	return out, rows.Err()
 }
+
+// pubgKnownWindow bounds how far back known match ids are read.
+//
+// The API never lists a match older than 14 days, so anything older can never
+// come back as a candidate. Reading the whole table instead would grow forever
+// for no gain, and this table is meant to grow forever: it is the only copy.
+const pubgKnownWindow = "30 days"
+
+// PubgKnownMatchIDs returns the ids already stored for a member, so a sync
+// pass can skip them. Reading a match is free against the quota but not free
+// in time, and a stored match cannot have changed.
+func (s *Store) PubgKnownMatchIDs(ctx context.Context, userID, gameID string) (map[string]bool, error) {
+	rows, err := s.pool.Query(ctx, `
+		SELECT match_id
+		  FROM pubg_matches
+		 WHERE user_id = $1 AND game_id = $2
+		   AND played_at > now() - $3::interval`, userID, gameID, pubgKnownWindow)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	known := make(map[string]bool)
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		known[id] = true
+	}
+	return known, rows.Err()
+}

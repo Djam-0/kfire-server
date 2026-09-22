@@ -128,3 +128,62 @@ func TestUnJoueurSansMatchNEstPasUneErreur(t *testing.T) {
 		t.Fatalf("joueur = %+v", p)
 	}
 }
+
+// playerByIDBody is the real shape of the single-player route, which answers
+// with an object where the name search answers with an array. Values invented,
+// for the same reason as above.
+const playerByIDBody = `{"data":{"type":"player","id":"account.abc",
+  "attributes":{"name":"Pseudo","shardId":"steam","banType":"Innocent","clanId":"","titleId":"pubg","patchVersion":"","stats":null},
+  "relationships":{"assets":{"data":[]},
+    "matches":{"data":[{"type":"match","id":"m1"},{"type":"match","id":"m2"}]}}}}`
+
+func TestUnIdentifiantDeCompteRendSesMatchsSansPasserParLePseudo(t *testing.T) {
+	var gotPath string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotPath = r.URL.Path
+		_, _ = w.Write([]byte(playerByIDBody))
+	}))
+	defer srv.Close()
+
+	c := New("clé-de-test")
+	c.APIBase = srv.URL
+	c.SetRate(1000)
+
+	p, err := c.PlayerByID("steam", "account.abc")
+	if err != nil {
+		t.Fatalf("PlayerByID: %v", err)
+	}
+	if p.AccountID != "account.abc" || p.Name != "Pseudo" {
+		t.Fatalf("joueur = %+v", p)
+	}
+	if len(p.MatchIDs) != 2 || p.MatchIDs[0] != "m1" {
+		t.Fatalf("MatchIDs = %v", p.MatchIDs)
+	}
+	if gotPath != "/shards/steam/players/account.abc" {
+		t.Fatalf("chemin = %q", gotPath)
+	}
+}
+
+func TestUnCompteSansAucunMatchNEstPasUneErreur(t *testing.T) {
+	// A member who has not played for a fortnight: the publisher has deleted
+	// everything, so the account is real and its match list is empty. A sync
+	// pass must read that as "nothing to do", not as a failure.
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write([]byte(`{"data":{"type":"player","id":"account.abc",
+			"attributes":{"name":"Pseudo"},
+			"relationships":{"matches":{"data":[]}}}}`))
+	}))
+	defer srv.Close()
+
+	c := New("clé-de-test")
+	c.APIBase = srv.URL
+	c.SetRate(1000)
+
+	p, err := c.PlayerByID("steam", "account.abc")
+	if err != nil {
+		t.Fatalf("PlayerByID: %v", err)
+	}
+	if len(p.MatchIDs) != 0 {
+		t.Fatalf("MatchIDs = %v", p.MatchIDs)
+	}
+}

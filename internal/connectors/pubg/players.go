@@ -40,19 +40,7 @@ func (c *Connector) PlayerByName(platform, name string) (Player, error) {
 	path := "/shards/" + url.PathEscape(platform) + "/players?" + q.Encode()
 
 	var body struct {
-		Data []struct {
-			ID         string `json:"id"`
-			Attributes struct {
-				Name string `json:"name"`
-			} `json:"attributes"`
-			Relationships struct {
-				Matches struct {
-					Data []struct {
-						ID string `json:"id"`
-					} `json:"data"`
-				} `json:"matches"`
-			} `json:"relationships"`
-		} `json:"data"`
+		Data []playerEntry `json:"data"`
 	}
 	if err := c.get(path, &body); err != nil {
 		// The searched name is in the path, and the path ends up in logs. The
@@ -74,13 +62,58 @@ func (c *Connector) PlayerByName(platform, name string) (Player, error) {
 		}
 	}
 
-	e := body.Data[0]
+	return body.Data[0].player(), nil
+}
+
+// PlayerByID lists an account's recent matches, without going through its
+// name.
+//
+// This is what the daily sync uses. The name is deliberately not involved: a
+// member who renames themself in game would otherwise stop being collected
+// silently, and with a 14-day retention nobody would notice in time to get
+// those matches back.
+//
+// Like the name lookup, this one is metered, so it waits for the limiter. It
+// is the only quota-counted call a sync pass makes per member.
+func (c *Connector) PlayerByID(platform, accountID string) (Player, error) {
+	path := "/shards/" + url.PathEscape(platform) + "/players/" + url.PathEscape(accountID)
+
+	// This route answers with a single object where the name search answers
+	// with an array, so the envelope differs even though the player inside is
+	// the same shape.
+	var body struct {
+		Data playerEntry `json:"data"`
+	}
+	if err := c.get(path, &body); err != nil {
+		return Player{}, err
+	}
+	return body.Data.player(), nil
+}
+
+// playerEntry is a player object as both player routes carry it.
+type playerEntry struct {
+	ID         string `json:"id"`
+	Attributes struct {
+		Name string `json:"name"`
+	} `json:"attributes"`
+	Relationships struct {
+		Matches struct {
+			Data []struct {
+				ID string `json:"id"`
+			} `json:"data"`
+		} `json:"matches"`
+	} `json:"relationships"`
+}
+
+// player converts a decoded entry, dropping everything the portal has no use
+// for. MatchIDs keeps the API's order, newest first.
+func (e playerEntry) player() Player {
 	p := Player{AccountID: e.ID, Name: e.Attributes.Name}
 	p.MatchIDs = make([]string, 0, len(e.Relationships.Matches.Data))
 	for _, m := range e.Relationships.Matches.Data {
 		p.MatchIDs = append(p.MatchIDs, m.ID)
 	}
-	return p, nil
+	return p
 }
 
 // redactName strips the searched name out of a path before it lands in an
