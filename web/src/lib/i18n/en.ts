@@ -111,6 +111,7 @@ export const en = {
 		lolGold: 'Gold'
 	},
 	recap: {
+		filterStale: 'outside this range',
 		title: 'Session recap',
 		subtitle: 'Pick a range and see what the guild played during it.',
 		from: 'Start',
@@ -118,7 +119,14 @@ export const en = {
 		apply: 'Show',
 		loading: 'Loading the recap...',
 		empty: 'No match was reported over this range.',
+		emptyFiltered: 'No match matches this filter.',
 		totalMatches: '{count} matches reported',
+		filterGame: 'Game',
+		filterMember: 'Member',
+		allGames: 'All games',
+		allMembers: 'All members',
+		filtering: 'Filtered view:',
+		clearFilters: 'Show everything',
 		summary: 'Summary',
 		timeline: 'Timeline',
 		member: 'Member',

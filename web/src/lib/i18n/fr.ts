@@ -112,6 +112,7 @@ export const fr: Catalog = {
 		lolGold: 'Or'
 	},
 	recap: {
+		filterStale: 'hors de cette plage',
 		title: 'Bilan de session',
 		subtitle: 'Choisissez une plage et voyez ce que la guilde y a joué.',
 		from: 'Début',
@@ -119,7 +120,14 @@ export const fr: Catalog = {
 		apply: 'Afficher',
 		loading: 'Chargement du bilan...',
 		empty: 'Aucun match rapporté sur cette plage.',
+		emptyFiltered: 'Aucun match ne correspond à ce filtre.',
 		totalMatches: '{count} matchs rapportés',
+		filterGame: 'Jeu',
+		filterMember: 'Membre',
+		allGames: 'Tous les jeux',
+		allMembers: 'Tous les membres',
+		filtering: 'Vue filtrée :',
+		clearFilters: 'Tout afficher',
 		summary: 'Bilan',
 		timeline: 'Chronologie',
 		member: 'Membre',
