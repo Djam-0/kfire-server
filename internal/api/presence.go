@@ -27,6 +27,12 @@ func (h *handlers) presenceEntry(userID, username string, avatar *string, game *
 		if gameStart != nil {
 			entry["since"] = gameStart.UTC()
 		}
+		// The match in progress, when the hub holds one. Gated on the same
+		// showGame as the game itself, so a member who hides their activity
+		// does not leak a live score through the snapshot.
+		if live := h.hub.LiveSnapshot(userID); live != nil {
+			entry["live"] = live
+		}
 	} else if status == "online" && online != nil {
 		entry["since"] = online.UTC()
 	}

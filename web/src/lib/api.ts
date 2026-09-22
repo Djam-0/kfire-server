@@ -568,6 +568,10 @@ export type PresenceEntry = {
 	status: 'offline' | 'online' | 'in_game';
 	game?: Game | null;
 	since?: string;
+	/** The match in progress, when the server holds one. Present only on a
+	 *  snapshot, never on a `presence_update`: live changes travel on their own
+	 *  `live_match` events. */
+	live?: { game_slug: string; match: Record<string, unknown> } | null;
 };
 
 export type GameStat = {

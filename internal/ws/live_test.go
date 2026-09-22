@@ -393,3 +393,46 @@ func ageLiveEntry(h *Hub, userID string, by time.Duration) {
 	e.updatedAt = e.updatedAt.Add(-by)
 	h.live[userID] = e
 }
+
+// TestLiveSnapshot covers what a freshly loaded page is handed.
+//
+// The regression it guards is Hearthstone's: a reload mid-turn showed nothing
+// at all, because the browser store starts empty and Hearthstone only emits on
+// turn changes. The hub knew; it just never said.
+func TestLiveSnapshot(t *testing.T) {
+	h := NewHub(nil, nil, "", nil, nil)
+
+	if h.LiveSnapshot("inconnu") != nil {
+		t.Error("a member with no match must produce no snapshot")
+	}
+
+	h.setLive("u1", livestate.State{
+		Slug:  "hearthstone",
+		Match: map[string]any{"mode": "battlegrounds", "turn": 7},
+		TTL:   2 * time.Minute,
+	}, sourceClient)
+
+	got := h.LiveSnapshot("u1")
+	if got == nil {
+		t.Fatal("a match in progress must produce a snapshot")
+	}
+	if got["game_slug"] != "hearthstone" {
+		t.Errorf("the snapshot must name its game, got %v", got["game_slug"])
+	}
+	m, ok := got["match"].(map[string]any)
+	if !ok || m["turn"] != 7 {
+		t.Errorf("the snapshot must carry the state itself, got %v", got["match"])
+	}
+
+	// An entry nobody has refreshed is as good as gone: handing it to a page
+	// would paint a score that stopped being true minutes ago.
+	h.mu.Lock()
+	e := h.live["u1"]
+	e.updatedAt = time.Now().Add(-3 * time.Minute)
+	h.live["u1"] = e
+	h.mu.Unlock()
+
+	if h.LiveSnapshot("u1") != nil {
+		t.Error("an expired entry must produce no snapshot")
+	}
+}
