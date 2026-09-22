@@ -384,6 +384,8 @@ export type RecapGameBlock = {
 	game_id: string;
 	game_slug: string;
 	game_name: string;
+	/** Absent when the catalog holds no icon for that game. */
+	icon_url?: string;
 	matches: number;
 	members: RecapMember[];
 };
@@ -394,6 +396,8 @@ export type RecapEntry = RecapMember & {
 	game_id: string;
 	game_slug: string;
 	game_name: string;
+	/** Absent when the catalog holds no icon for that game. */
+	icon_url?: string;
 };
 
 /** A Rocket League timeline entry. Unlike a live sample, it has team_size. */
