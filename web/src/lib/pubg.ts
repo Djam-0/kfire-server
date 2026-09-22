@@ -58,6 +58,12 @@ export function pubgTotalWins(players: PubgPlayer[]): number {
  * translated: Erangel is Erangel in French. An unknown map falls back to its
  * raw identifier rather than to an empty cell, because a new map ships every
  * few months and a blank would look like missing data.
+ *
+ * Six of these were seen on real matches on 2026-09-22: Baltic, Tiger, Desert,
+ * Neon, DihorOtok and Chimera. The others come from knowledge of the game and
+ * are unconfirmed, so a wrong one shows its raw identifier rather than a wrong
+ * name. Range_Main, the training range, is deliberately absent: such a session
+ * is never stored, so listing it here would suggest otherwise.
  */
 const mapNames: Record<string, string> = {
 	Baltic_Main: 'Erangel',
@@ -70,8 +76,7 @@ const mapNames: Record<string, string> = {
 	Kiki_Main: 'Deston',
 	Chimera_Main: 'Paramo',
 	Heaven_Main: 'Haven',
-	Neon_Main: 'Rondo',
-	Italy_Main: 'Rondo'
+	Neon_Main: 'Rondo'
 };
 
 export function pubgMapLabel(mapName: string): string {
