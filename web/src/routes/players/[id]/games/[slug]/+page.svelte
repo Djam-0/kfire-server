@@ -14,6 +14,7 @@
 		hsTrend
 	} from '$lib/hearthstone';
 	import { rlModeLabel, rlSideScore } from '$lib/rocketleague';
+	import { pubgIsChickenDinner, pubgMapLabel, pubgModeLabel } from '$lib/pubg';
 	import HsResult from '$lib/components/HsResult.svelte';
 
 	let detail = $state<PlayerGameDetail | null>(null);
@@ -768,6 +769,82 @@
 					</li>
 				{/each}
 			</ul>
+		</section>
+	{/if}
+
+	<!-- PUBG: the member's own matches.
+	     Rendered even when the list comes back empty, because an empty list is
+	     itself the answer here: the publisher deletes matches after 14 days, and
+	     a member who sees nothing needs to know whether that means "not
+	     collected yet" rather than "you never played". The block is skipped
+	     entirely when the key is absent, since the plugin then sends no field at
+	     all and the page must not speak for a connector that is off. -->
+	{#if detail.pubg_matches}
+		{@const matches = detail.pubg_matches}
+		{@const dinners = matches.filter(pubgIsChickenDinner).length}
+		{@const kills = matches.reduce((n, m) => n + m.kills, 0)}
+		{@const damage = matches.length
+			? Math.round(matches.reduce((n, m) => n + m.damage_dealt, 0) / matches.length)
+			: 0}
+		{@const best = matches.length ? Math.min(...matches.map((m) => m.win_place)) : 0}
+		<section class="mb-6">
+			<h2 class="pd-heading mb-3 flex items-center gap-2 text-sm text-[var(--color-brand-bright)]">
+				<span class="inline-block h-4 w-1 bg-[var(--color-brand)]"></span>
+				{t('game.pubgRecord')}
+			</h2>
+
+			{#if !matches.length}
+				<p class="pd-card p-3 text-sm text-[var(--color-muted)]">{t('game.pubgNoMatches')}</p>
+			{:else}
+				<!-- Counters: over the matches listed below, not over all history -->
+				<div class="mb-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
+					<div class="pd-card p-3">
+						<p class="text-xs uppercase tracking-wide text-[var(--color-muted)]">{t('game.pubgWins')}</p>
+						<p class="font-display text-2xl font-bold tabular-nums text-[var(--color-gold)]">{dinners}</p>
+					</div>
+					<div class="pd-card p-3">
+						<p class="text-xs uppercase tracking-wide text-[var(--color-muted)]">{t('game.pubgBestPlace')}</p>
+						<p class="font-display text-2xl font-bold tabular-nums text-[var(--color-cyan)]">#{best}</p>
+					</div>
+					<div class="pd-card p-3">
+						<p class="text-xs uppercase tracking-wide text-[var(--color-muted)]">{t('game.pubgKills')}</p>
+						<p class="font-display text-2xl font-bold tabular-nums text-[var(--color-text)]">{kills}</p>
+					</div>
+					<div class="pd-card p-3">
+						<p class="text-xs uppercase tracking-wide text-[var(--color-muted)]">{t('game.pubgAvgDamage')}</p>
+						<p class="font-display text-2xl font-bold tabular-nums text-[var(--color-brand-bright)]">{damage}</p>
+					</div>
+				</div>
+
+				<h3 class="mt-5 mb-2 font-display text-xs uppercase tracking-wide text-[var(--color-muted)]">
+					{t('game.pubgRecentMatches')}
+				</h3>
+				<ul class="flex flex-col gap-2">
+					{#each matches as m (m.match_id)}
+						<li class="pd-card flex flex-wrap items-center gap-3 p-3">
+							{#if pubgIsChickenDinner(m)}
+								<span class="pd-cut-sm bg-[var(--color-gold)]/15 px-1.5 py-0.5 font-display text-[10px] uppercase tracking-wide text-[var(--color-gold)]">
+									{t('game.pubgChickenDinner')}
+								</span>
+							{:else}
+								<span class="w-14 shrink-0 font-display text-sm font-bold tabular-nums text-[var(--color-muted)]">
+									#{m.win_place}
+								</span>
+							{/if}
+
+							<span class="text-sm text-[var(--color-text)]">{pubgMapLabel(m.map_name)}</span>
+							<span class="text-xs uppercase tracking-wide text-[var(--color-muted)]">{pubgModeLabel(m.game_mode)}</span>
+
+							<span class="ml-auto flex items-center gap-3 text-xs tabular-nums text-[var(--color-muted)]">
+								<span>{m.kills} {t('game.pubgKills').toLowerCase()}</span>
+								<span>{Math.round(m.damage_dealt)} {t('game.pubgDamage').toLowerCase()}</span>
+								<span>{formatDuration(m.time_survived)} {t('game.pubgSurvived').toLowerCase()}</span>
+								<span>{timeAgo(m.played_at)}</span>
+							</span>
+						</li>
+					{/each}
+				</ul>
+			{/if}
 		</section>
 	{/if}
 

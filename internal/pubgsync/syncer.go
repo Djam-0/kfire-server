@@ -28,10 +28,17 @@ import (
 // full refresh cheap.
 const syncEvery = 24 * time.Hour
 
-// gameSlug is the catalog entry PUBG matches are filed under. Recorded from
-// production on 2026-09-22; the catalog holds several games whose name
-// contains "battlegrounds", so this is the checked one and not a guess.
-const gameSlug = "pubg-battlegrounds"
+// SLUG is the catalog slug this package claims, for both the daily sync and
+// the plugin that displays what it collected.
+//
+// The two must never name different games: a sync filing matches under one
+// slug while the plugin reads another would show empty pages with nothing
+// logged and nothing failing. One constant is what makes that impossible.
+//
+// Recorded from production on 2026-09-22; the catalog holds several games
+// whose name contains "battlegrounds", so this is the checked one and not a
+// guess.
+const SLUG = "pubg-battlegrounds"
 
 // puller is the slice of the connector the walk actually uses. It is an
 // interface so the walk over a member's matches can be tested against a fake,
@@ -83,11 +90,11 @@ func (s *Syncer) SyncAll(ctx context.Context) {
 	if len(members) == 0 {
 		return // nobody linked: not worth resolving the game
 	}
-	game, err := s.store.GetGameBySlug(ctx, gameSlug)
+	game, err := s.store.GetGameBySlug(ctx, SLUG)
 	if err != nil {
 		// The catalog is imported in the background on a fresh instance, so
 		// the game can legitimately be missing for a few minutes after boot.
-		slog.Warn("pubgsync: PUBG is not in the games catalog yet", "slug", gameSlug, "err", err)
+		slog.Warn("pubgsync: PUBG is not in the games catalog yet", "slug", SLUG, "err", err)
 		return
 	}
 

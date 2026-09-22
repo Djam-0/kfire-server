@@ -274,7 +274,26 @@ export const fr: Catalog = {
 		rlBlue: 'Bleu',
 		rlOrange: 'Orange',
 		rlRecentMatches: 'Dernières parties',
-		rlRecordTile: 'Bilan'
+		rlRecordTile: 'Bilan',
+		pubgRecord: 'Bilan PUBG',
+		pubgPlayers: 'Membres suivis',
+		pubgMatches: 'Parties',
+		// Une victoire à PUBG s'appelle un Chicken Dinner et personne ne dit
+		// autrement à table, donc le libellé ne traduit pas.
+		pubgWins: 'Chicken Dinners',
+		pubgChickenDinner: 'Chicken Dinner',
+		pubgTopTenRate: 'Taux de top 10',
+		pubgKills: 'Éliminations',
+		pubgAvgDamage: 'Dégâts moyens',
+		pubgBestPlace: 'Meilleur classement',
+		pubgLastPlayed: 'Dernière partie',
+		pubgRankingNote:
+			"Classé par Chicken Dinners. L'éditeur efface les parties au bout de 14 jours, KFIRE garde donc l'historique que son API ne sait plus rendre.",
+		pubgRecentMatches: 'Dernières parties',
+		pubgDamage: 'Dégâts',
+		pubgSurvived: 'Survie',
+		pubgNoMatches:
+			"Aucune partie enregistrée pour l'instant. La collecte passe une fois par jour, et seules les parties des 14 derniers jours peuvent encore être récupérées."
 	},
 	playerGame: {
 		loading: 'Chargement...',

@@ -22,6 +22,13 @@
 		heroArt
 	} from '$lib/hearthstone';
 	import { rlWinRate, rlByWins, rlTotalMatches, rlTotalGoals } from '$lib/rocketleague';
+	import {
+		pubgByWins,
+		pubgTopTenRate,
+		pubgAvgDamage,
+		pubgTotalMatches,
+		pubgTotalWins
+	} from '$lib/pubg';
 
 	let detail = $state<GameDetail | null>(null);
 	let loading = $state(true);
@@ -80,6 +87,9 @@
 
 	const rlPlayers = $derived(detail?.rl_players ?? []);
 	const rlRanked = $derived(rlByWins(rlPlayers));
+
+	const pubgPlayers = $derived(detail?.pubg_players ?? []);
+	const pubgRanked = $derived(pubgByWins(pubgPlayers));
 
 	const wowChars = $derived(detail?.wow_characters ?? []);
 	const wowRosterList = $derived(wowRosters(wowChars));
@@ -568,6 +578,71 @@
 			</div>
 
 			<p class="mt-2 text-xs text-[var(--color-muted)]/80">{t('game.rlRankingNote')}</p>
+		</section>
+	{/if}
+
+	<!-- PUBG, guild record. No live block anywhere on the site for this game:
+	     PUBG's API exposes no match in progress, so there is nothing to show
+	     and a "not playing" card would be a lie rather than a gap. -->
+	{#if pubgPlayers.length}
+		<section class="mt-6">
+			<h2 class="pd-heading mb-3 flex items-center gap-2 text-sm text-[var(--color-brand-bright)]">
+				<span class="inline-block h-4 w-1 bg-[var(--color-brand)]"></span>
+				{t('game.pubgRecord')}
+			</h2>
+
+			<div class="mb-3 grid grid-cols-3 gap-3">
+				<div class="pd-card p-3">
+					<p class="text-xs uppercase tracking-wide text-[var(--color-muted)]">{t('game.pubgPlayers')}</p>
+					<p class="font-display text-2xl font-bold text-[var(--color-text)]">{pubgPlayers.length}</p>
+				</div>
+				<div class="pd-card p-3">
+					<p class="text-xs uppercase tracking-wide text-[var(--color-muted)]">{t('game.pubgMatches')}</p>
+					<p class="font-display text-2xl font-bold text-[var(--color-cyan)]">{pubgTotalMatches(pubgPlayers)}</p>
+				</div>
+				<div class="pd-card p-3">
+					<p class="text-xs uppercase tracking-wide text-[var(--color-muted)]">{t('game.pubgWins')}</p>
+					<p class="font-display text-2xl font-bold text-[var(--color-gold)]">{pubgTotalWins(pubgPlayers)}</p>
+				</div>
+			</div>
+
+			<div class="pd-card overflow-x-auto">
+				<table class="w-full min-w-[720px] border-collapse">
+					<thead>
+						<tr class="border-b border-[var(--color-border)]">
+							<th class="px-3 py-2 text-left font-display text-xs uppercase tracking-wide text-[var(--color-muted)]">{t('lol.member')}</th>
+							<th class="px-3 py-2 text-left font-display text-xs uppercase tracking-wide text-[var(--color-muted)]">{t('game.pubgMatches')}</th>
+							<th class="px-3 py-2 text-left font-display text-xs uppercase tracking-wide text-[var(--color-muted)]">{t('game.pubgWins')}</th>
+							<th class="px-3 py-2 text-left font-display text-xs uppercase tracking-wide text-[var(--color-muted)]">{t('game.pubgTopTenRate')}</th>
+							<th class="px-3 py-2 text-left font-display text-xs uppercase tracking-wide text-[var(--color-muted)]">{t('game.pubgKills')}</th>
+							<th class="px-3 py-2 text-left font-display text-xs uppercase tracking-wide text-[var(--color-muted)]">{t('game.pubgAvgDamage')}</th>
+							<th class="px-3 py-2 text-left font-display text-xs uppercase tracking-wide text-[var(--color-muted)]">{t('game.pubgBestPlace')}</th>
+							<th class="px-3 py-2 text-left font-display text-xs uppercase tracking-wide text-[var(--color-muted)]">{t('game.pubgLastPlayed')}</th>
+						</tr>
+					</thead>
+					<tbody>
+						{#each pubgRanked as p (p.user_id)}
+							<tr class="border-b border-[var(--color-border)]/50 last:border-b-0 hover:bg-[var(--color-surface-2)]">
+								<td class="px-3 py-2">
+									<a href="/players/{p.user_id}" class="flex items-center gap-2 hover:underline">
+										<Avatar username={p.username} url={p.avatar_url} size={28} />
+										<span class="truncate font-display font-semibold text-[var(--color-text)]">{p.username}</span>
+									</a>
+								</td>
+								<td class="px-3 py-2 whitespace-nowrap text-sm tabular-nums text-[var(--color-muted)]">{p.matches}</td>
+								<td class="px-3 py-2 whitespace-nowrap text-sm tabular-nums text-[var(--color-gold)]">{p.wins}</td>
+								<td class="px-3 py-2 whitespace-nowrap text-sm tabular-nums text-[var(--color-brand-bright)]">{pubgTopTenRate(p)}%</td>
+								<td class="px-3 py-2 whitespace-nowrap text-sm tabular-nums">{p.kills}</td>
+								<td class="px-3 py-2 whitespace-nowrap text-sm tabular-nums">{pubgAvgDamage(p)}</td>
+								<td class="px-3 py-2 whitespace-nowrap text-sm tabular-nums text-[var(--color-cyan)]">#{p.best_place}</td>
+								<td class="px-3 py-2 whitespace-nowrap text-sm text-[var(--color-muted)]">{timeAgo(p.last_played_at)}</td>
+							</tr>
+						{/each}
+					</tbody>
+				</table>
+			</div>
+
+			<p class="mt-2 text-xs text-[var(--color-muted)]/80">{t('game.pubgRankingNote')}</p>
 		</section>
 	{/if}
 

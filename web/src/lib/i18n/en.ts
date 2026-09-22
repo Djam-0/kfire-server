@@ -273,7 +273,25 @@ export const en = {
 		rlBlue: 'Blue',
 		rlOrange: 'Orange',
 		rlRecentMatches: 'Recent matches',
-		rlRecordTile: 'Record'
+		rlRecordTile: 'Record',
+		pubgRecord: 'PUBG record',
+		pubgPlayers: 'Members tracked',
+		pubgMatches: 'Matches',
+		// A PUBG win is a Chicken Dinner and nobody calls it anything else.
+		pubgWins: 'Chicken Dinners',
+		pubgChickenDinner: 'Chicken Dinner',
+		pubgTopTenRate: 'Top 10 rate',
+		pubgKills: 'Kills',
+		pubgAvgDamage: 'Avg damage',
+		pubgBestPlace: 'Best placement',
+		pubgLastPlayed: 'Last played',
+		pubgRankingNote:
+			'Ranked by Chicken Dinners. The publisher deletes matches after 14 days, so KFIRE keeps the history its API can no longer return.',
+		pubgRecentMatches: 'Recent matches',
+		pubgDamage: 'Damage',
+		pubgSurvived: 'Survived',
+		pubgNoMatches:
+			'No match recorded yet. Collection runs once a day, and only the last 14 days can still be fetched.'
 	},
 	playerGame: {
 		loading: 'Loading...',

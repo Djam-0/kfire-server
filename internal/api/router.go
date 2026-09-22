@@ -26,6 +26,7 @@ import (
 	"github.com/knightsofeternity/kfire-server/internal/crypto"
 	"github.com/knightsofeternity/kfire-server/internal/gameplugin"
 	"github.com/knightsofeternity/kfire-server/internal/hearthstone"
+	"github.com/knightsofeternity/kfire-server/internal/pubgsync"
 	"github.com/knightsofeternity/kfire-server/internal/riotsync"
 	"github.com/knightsofeternity/kfire-server/internal/rocketleague"
 	"github.com/knightsofeternity/kfire-server/internal/steamsync"
@@ -92,6 +93,10 @@ func Register(app *fiber.App, cfg *config.Config, st *store.Store, hub *ws.Hub, 
 	plugins.Register(lolPlugin)
 	plugins.Register(hearthstone.New(st))
 	plugins.Register(rocketleague.New(st))
+	// Built here and not below with the other connectors: the quota belongs to
+	// the key, and a second instance would carry a second limiter.
+	pubgConn := pubg.New(cfg.PubgAPIKey)
+	plugins.Register(pubgsync.NewPlugin(st, pubgConn))
 	if err := plugins.Load(context.Background()); err != nil {
 		slog.Error("game plugins load", "err", err)
 	}
@@ -108,7 +113,6 @@ func Register(app *fiber.App, cfg *config.Config, st *store.Store, hub *ws.Hub, 
 	if cfg.XblAPIBase != "" {
 		xblConn.APIBase = cfg.XblAPIBase
 	}
-	pubgConn := pubg.New(cfg.PubgAPIKey)
 	h := &handlers{cfg: cfg, store: st, hub: hub, steam: steamConn, steamSync: syncer, battlenet: bnConn, bnetSync: bnetSync, xbox: xblConn, riot: riotConn, riotSync: riotSync, pubg: pubgConn, cipher: cipher, plugins: plugins}
 
 	app.Get("/healthz", func(c *fiber.Ctx) error {

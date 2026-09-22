@@ -279,6 +279,54 @@ export type RlMatch = {
 };
 
 /**
+ * A member's PUBG record for one game, aggregated by the database over the
+ * whole stored history.
+ *
+ * There is no teammate anywhere in here, and there cannot be: a PUBG response
+ * names all hundred players of a match, and the table those numbers come from
+ * has no column able to hold a name.
+ */
+export type PubgPlayer = {
+	user_id: string;
+	username: string;
+	avatar_url?: string;
+	matches: number;
+	/** Matches finished first: a Chicken Dinner, as players call it. */
+	wins: number;
+	top_tens: number;
+	kills: number;
+	/** Total damage over every stored match, not a per-match average. */
+	damage_dealt: number;
+	/** Lowest finishing position reached, so 1 is the best possible. */
+	best_place: number;
+	time_survived: number; // seconds
+	last_played_at: string;
+};
+
+/**
+ * One stored PUBG match, from the member's own history, newest first.
+ *
+ * `map_name` and `game_mode` are PUBG's own identifiers (`Baltic_Main`,
+ * `squad-fpp`) and never a label: the server sends the fact and the browser
+ * names it, because the name differs per language.
+ */
+export type PubgMatch = {
+	match_id: string;
+	game_mode: string;
+	map_name: string;
+	/** 1 is a Chicken Dinner. */
+	win_place: number;
+	kills: number;
+	assists: number;
+	headshot_kills: number;
+	revives: number;
+	damage_dealt: number;
+	time_survived: number;
+	duration_secs: number;
+	played_at: string;
+};
+
+/**
  * The member a recap row CAME FROM, and nothing else.
  *
  * There is deliberately no second player anywhere in a recap: the match tables
@@ -406,6 +454,7 @@ export type GameDetail = {
 	hs_players?: HsPlayer[];
 	hs_heroes?: HsHero[];
 	rl_players?: RlPlayer[];
+	pubg_players?: PubgPlayer[];
 };
 
 export type PlayerGameAchievement = {
@@ -469,6 +518,8 @@ export type PlayerGameDetail = {
 	hs_profile?: HsProfile;
 	/** The member's last ten Rocket League matches, newest first. */
 	rl_matches?: RlMatch[];
+	/** The member's last ten stored PUBG matches, newest first. */
+	pubg_matches?: PubgMatch[];
 	achievements?: PlayerGameAchievement[];
 };
 
