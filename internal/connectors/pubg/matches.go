@@ -19,13 +19,24 @@ var ErrNoParticipant = errors.New("pubg: match has no such participant")
 // playableMatchTypes is a list of what we KEEP, deliberately, and not a list
 // of what we reject.
 //
-// Observed values include tutorialatoz and airoyale, and mapName takes
-// Range_Main for the training range. Recording those would skew every member's
-// average placement and match count, which is exactly what happened on Rocket
-// League when training counted as play. New values will appear one day: an
-// unknown type must be dropped by default rather than stored by accident,
-// because six sampled matches are not an exhaustive list of anything.
-var playableMatchTypes = map[string]bool{"official": true, "competitive": true}
+// That direction is not a style preference, it was proven: a survey of forty
+// real matches on 2026-09-22 turned up trainingroom, a type absent from the
+// first survey of six. A reject list would have stored training sessions as
+// games, which is exactly what happened on Rocket League. An unknown type must
+// therefore be dropped by default, because no sample is an exhaustive list of
+// anything.
+//
+// airoyale is kept, decided on 2026-09-22. It is a real mode people play, and
+// the publisher deletes everything after fourteen days, so excluding it would
+// lose those games for good. The cost is accepted and worth knowing: its planes
+// and its descent make it a different game, so it slightly distorts an average
+// placement computed across every mode. Splitting by mode is the way out when
+// that starts to matter.
+var playableMatchTypes = map[string]bool{
+	"official":    true,
+	"competitive": true,
+	"airoyale":    true,
+}
 
 // trainingMaps are not matches whatever the match type says.
 var trainingMaps = map[string]bool{"Range_Main": true}

@@ -129,7 +129,13 @@ func TestUnEntrainementNEstPasUnePartie(t *testing.T) {
 		{"tutoriel", "tutorialatoz", "Baltic_Main", false},
 		{"champ de tir", "official", "Range_Main", false},
 		{"partie personnalisée", "official", "Baltic_Main", true},
-		{"mode inconnu écarté par défaut", "airoyale", "Baltic_Main", false},
+		// trainingroom est réel : il n'apparaissait pas dans le premier relevé de
+		// six matchs et a été trouvé sur quarante. C'est la preuve que la liste
+		// doit être une liste d'acceptation.
+		{"salle d'entraînement", "trainingroom", "Baltic_Main", false},
+		// Et un type qui n'existe pas, pour verrouiller le refus par défaut :
+		// l'éditeur en ajoutera d'autres.
+		{"mode inconnu écarté par défaut", "unmodefutur", "Baltic_Main", false},
 	}
 	for _, k := range cas {
 		t.Run(k.nom, func(t *testing.T) {
@@ -139,6 +145,19 @@ func TestUnEntrainementNEstPasUnePartie(t *testing.T) {
 				t.Fatalf("attendu ErrNotPlayable, obtenu %v", err)
 			}
 		})
+	}
+}
+
+// Air Royale est un vrai mode joué, gardé sciemment le 2026-09-22 : l'éditeur
+// efface tout à 14 jours, donc l'écarter perdrait ces parties pour de bon.
+func TestAirRoyaleEstUneVraiePartie(t *testing.T) {
+	c := serveMatch(t, matchBody("airoyale", "Baltic_Main", "612.34", false))
+	r, err := c.MatchForPlayer("steam", "match-1", "account.membre")
+	if err != nil {
+		t.Fatalf("Air Royale doit être enregistré : %v", err)
+	}
+	if r.MatchType != "airoyale" {
+		t.Fatalf("type %q, attendu airoyale", r.MatchType)
 	}
 }
 
