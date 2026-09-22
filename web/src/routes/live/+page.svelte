@@ -7,15 +7,31 @@
 	import { presence } from '$lib/stores/presence.svelte';
 	import type { PresenceEntry } from '$lib/api';
 	import Avatar from '$lib/components/Avatar.svelte';
-	import { rlLiveMatch, type RlLiveMatch } from '$lib/rocketleague';
-	import { lolLiveMatch, type LolLiveMatch } from '$lib/lol';
-	import { hsLiveMatch, type HsLiveMatch } from '$lib/hearthstone';
+	import { RL_SLUG, rlLiveMatch, type RlLiveMatch } from '$lib/rocketleague';
+	import { LOL_SLUG, lolLiveMatch, type LolLiveMatch } from '$lib/lol';
+	import { HS_SLUG, hsLiveMatch, type HsLiveMatch } from '$lib/hearthstone';
 	import RocketLeagueCard from '$lib/components/live/RocketLeagueCard.svelte';
 	import LeagueOfLegendsCard from '$lib/components/live/LeagueOfLegendsCard.svelte';
 	import HearthstoneCard from '$lib/components/live/HearthstoneCard.svelte';
 	import { t } from '$lib/i18n';
 
 	let names = $derived(new Map(presence.list.map((m) => [m.user_id, m.username])));
+
+	// A card's game icon comes from presence, which already carries it, rather
+	// than from the live payload: that payload is broadcast twice a second and
+	// must stay as small as it can be, while an icon cannot change mid-match.
+	//
+	// Keyed by slug, not by member, so one member being absent from presence
+	// does not cost the others their icon. When nobody at all is in presence
+	// the icon is simply missing, which is the degradation the username already
+	// has on these cards.
+	let icons = $derived(
+		new Map(
+			presence.list
+				.filter((m) => m.game?.icon_url)
+				.map((m) => [m.game!.slug, m.game!.icon_url as string])
+		)
+	);
 
 	type RlCard = { userId: string; username?: string; match: RlLiveMatch };
 	type LolCard = { userId: string; username?: string; match: LolLiveMatch };
@@ -89,13 +105,17 @@
 {#if hasCards}
 	<div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
 		{#each rlCards as card (card.userId)}
-			<RocketLeagueCard username={card.username} match={card.match} />
+			<RocketLeagueCard username={card.username} match={card.match} icon={icons.get(RL_SLUG)} />
 		{/each}
 		{#each lolCards as card (card.userId)}
-			<LeagueOfLegendsCard username={card.username} match={card.match} />
+			<LeagueOfLegendsCard
+				username={card.username}
+				match={card.match}
+				icon={icons.get(LOL_SLUG)}
+			/>
 		{/each}
 		{#each hsCards as card (card.userId)}
-			<HearthstoneCard username={card.username} match={card.match} />
+			<HearthstoneCard username={card.username} match={card.match} icon={icons.get(HS_SLUG)} />
 		{/each}
 	</div>
 {/if}

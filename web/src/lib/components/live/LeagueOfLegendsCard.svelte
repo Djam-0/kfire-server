@@ -13,11 +13,16 @@
 	import type { LolLiveMatch } from '$lib/lol';
 	import { formatClock, formatDuration } from '$lib/format';
 	import { t } from '$lib/i18n';
+	import GameIcon from '$lib/components/GameIcon.svelte';
 
 	// `username` is optional for the same reason as on the Rocket League card:
 	// the live store is keyed by user id and presence is what puts a name on
 	// it, so a member missing from presence still gets his card.
-	let { username, match }: { username?: string; match: LolLiveMatch } = $props();
+	// `icon` is the game's icon, handed down by the page from presence. It is
+	// optional for the same reason `username` is: a card must never wait on
+	// presence to exist.
+	let { username, match, icon }: { username?: string; match: LolLiveMatch; icon?: string } =
+		$props();
 
 	// The client pushes the in-game clock outright. Spectator only gives the
 	// start, so the elapsed time has to be counted here, and it ticks once a
@@ -65,6 +70,7 @@
 
 <article class="pd-card flex flex-col gap-2 p-3">
 	<header class="flex items-center gap-2">
+		<GameIcon url={icon} size={20} />
 		<span class="font-display min-w-0 flex-1 truncate font-semibold text-[var(--color-text)]">
 			{username ?? t('live.unknownMember')}
 		</span>

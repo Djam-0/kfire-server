@@ -6,12 +6,17 @@
 	import type { RlLiveMatch } from '$lib/rocketleague';
 	import { formatClock } from '$lib/format';
 	import { t } from '$lib/i18n';
+	import GameIcon from '$lib/components/GameIcon.svelte';
 
 	// `username` is optional: the live store is keyed by user id and presence is
 	// what puts a name on it, so a member missing from presence still gets his
 	// card rather than disappearing from the page. A neutral label, not a blank
 	// space, because an empty name reads as a broken card, not as a missing one.
-	let { username, match }: { username?: string; match: RlLiveMatch } = $props();
+	// `icon` is the game's icon, handed down by the page from presence. It is
+	// optional for the same reason `username` is: a card must never wait on
+	// presence to exist.
+	let { username, match, icon }: { username?: string; match: RlLiveMatch; icon?: string } =
+		$props();
 
 	let stats = $derived([
 		{ label: t('game.rlGoals'), value: match.goals },
@@ -25,6 +30,7 @@
 
 <article class="pd-card flex flex-col gap-2 p-3">
 	<header class="flex items-center gap-2">
+		<GameIcon url={icon} size={20} />
 		<span class="font-display min-w-0 flex-1 truncate font-semibold text-[var(--color-text)]">
 			{username ?? t('live.unknownMember')}
 		</span>

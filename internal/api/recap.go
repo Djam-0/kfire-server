@@ -291,19 +291,36 @@ func hearthstoneMemberJSON(s hearthstoneRecapMember) fiber.Map {
 	return out
 }
 
+// recapGameIcon adds a link to the image cache, and only when the catalog
+// actually holds an icon for that game.
+//
+// Emitting the link unconditionally would be simpler and wrong: the cache
+// answers 404 for a game with no source image, and the page would draw a
+// broken image beside a name that is perfectly fine. Absence is the signal,
+// so it is decided here rather than guessed by the browser.
+func recapGameIcon(out fiber.Map, base string, game store.RecapGame) {
+	if game.GameIcon != nil {
+		out["icon_url"] = base + "/img/games/" + game.GameID + "/icon"
+	}
+}
+
 // recapEntryJSON is the shared head of a timeline entry: when, which member it
 // came from, and which game.
-func recapEntryJSON(owner store.RecapMatchOwner, game store.RecapGame, playedAt time.Time) fiber.Map {
+//
+// base is the server's public URL, threaded down rather than read from a
+// global so these builders stay plain functions the tests can call.
+func recapEntryJSON(base string, owner store.RecapMatchOwner, game store.RecapGame, playedAt time.Time) fiber.Map {
 	out := recapMemberJSON(recapMember{owner.UserID, owner.Username, owner.AvatarURL})
 	out["played_at"] = playedAt.UTC()
 	out["game_id"] = game.GameID
 	out["game_slug"] = game.GameSlug
 	out["game_name"] = game.GameName
+	recapGameIcon(out, base, game)
 	return out
 }
 
-func rocketLeagueEntryJSON(m store.RecapRocketLeagueMatch) fiber.Map {
-	out := recapEntryJSON(m.RecapMatchOwner, m.RecapGame, m.PlayedAt)
+func rocketLeagueEntryJSON(base string, m store.RecapRocketLeagueMatch) fiber.Map {
+	out := recapEntryJSON(base, m.RecapMatchOwner, m.RecapGame, m.PlayedAt)
 	out["result"] = m.Result
 	out["playlist"] = m.Playlist
 	out["team_size"] = m.TeamSize
@@ -321,8 +338,8 @@ func rocketLeagueEntryJSON(m store.RecapRocketLeagueMatch) fiber.Map {
 	return out
 }
 
-func hearthstoneEntryJSON(m store.RecapHearthstoneMatch) fiber.Map {
-	out := recapEntryJSON(m.RecapMatchOwner, m.RecapGame, m.PlayedAt)
+func hearthstoneEntryJSON(base string, m store.RecapHearthstoneMatch) fiber.Map {
+	out := recapEntryJSON(base, m.RecapMatchOwner, m.RecapGame, m.PlayedAt)
 	out["mode"] = m.Mode
 	out["result"] = m.Result
 	out["turns"] = m.Turns
@@ -338,23 +355,23 @@ func hearthstoneEntryJSON(m store.RecapHearthstoneMatch) fiber.Map {
 // entry comes first, which is arbitrary but stable: two members playing at the
 // same instant is a coincidence, never a shared match, and the order between
 // them carries no meaning.
-func mergeRecapTimeline(rl []store.RecapRocketLeagueMatch, hs []store.RecapHearthstoneMatch) []fiber.Map {
+func mergeRecapTimeline(base string, rl []store.RecapRocketLeagueMatch, hs []store.RecapHearthstoneMatch) []fiber.Map {
 	out := make([]fiber.Map, 0, len(rl)+len(hs))
 	i, j := 0, 0
 	for i < len(rl) && j < len(hs) {
 		if hs[j].PlayedAt.Before(rl[i].PlayedAt) {
-			out = append(out, hearthstoneEntryJSON(hs[j]))
+			out = append(out, hearthstoneEntryJSON(base, hs[j]))
 			j++
 			continue
 		}
-		out = append(out, rocketLeagueEntryJSON(rl[i]))
+		out = append(out, rocketLeagueEntryJSON(base, rl[i]))
 		i++
 	}
 	for ; i < len(rl); i++ {
-		out = append(out, rocketLeagueEntryJSON(rl[i]))
+		out = append(out, rocketLeagueEntryJSON(base, rl[i]))
 	}
 	for ; j < len(hs); j++ {
-		out = append(out, hearthstoneEntryJSON(hs[j]))
+		out = append(out, hearthstoneEntryJSON(base, hs[j]))
 	}
 	return out
 }
@@ -393,13 +410,15 @@ func (h *handlers) recap(c *fiber.Ctx) error {
 	sortRecapBlocks(blocks)
 	games := make([]fiber.Map, 0, len(blocks))
 	for _, b := range blocks {
-		games = append(games, fiber.Map{
+		block := fiber.Map{
 			"game_id":   b.GameID,
 			"game_slug": b.GameSlug,
 			"game_name": b.GameName,
 			"matches":   b.Matches,
 			"members":   b.Members,
-		})
+		}
+		recapGameIcon(block, h.cfg.PublicURL, b.RecapGame)
+		games = append(games, block)
 	}
 
 	return c.JSON(fiber.Map{
@@ -407,6 +426,6 @@ func (h *handlers) recap(c *fiber.Ctx) error {
 		"to":            w.To,
 		"total_matches": len(rl) + len(hs),
 		"games":         games,
-		"timeline":      mergeRecapTimeline(rl, hs),
+		"timeline":      mergeRecapTimeline(h.cfg.PublicURL, rl, hs),
 	})
 }

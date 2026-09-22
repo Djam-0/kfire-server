@@ -1,6 +1,7 @@
 package api
 
 import (
+	"github.com/gofiber/fiber/v2"
 	"testing"
 	"time"
 
@@ -175,7 +176,7 @@ func TestAggregateVide(t *testing.T) {
 	if b := aggregateHearthstone(nil); len(b) != 0 {
 		t.Errorf("hearthstone : %d blocs pour aucun match", len(b))
 	}
-	if tl := mergeRecapTimeline(nil, nil); len(tl) != 0 {
+	if tl := mergeRecapTimeline("", nil, nil); len(tl) != 0 {
 		t.Errorf("chronologie : %d entrées pour aucun match", len(tl))
 	}
 }
@@ -195,7 +196,7 @@ func TestMergeRecapTimeline(t *testing.T) {
 		hsMatch(kae, debut.Add(2*time.Hour), "loss", placement(7)),
 	}
 
-	tl := mergeRecapTimeline(rl, hs)
+	tl := mergeRecapTimeline("https://exemple.test", rl, hs)
 	if len(tl) != 5 {
 		t.Fatalf("%d entrées, attendu 5", len(tl))
 	}
@@ -228,5 +229,31 @@ func TestSortRecapBlocks(t *testing.T) {
 	sortRecapBlocks(blocks)
 	if blocks[0].GameSlug != "rocket-league" {
 		t.Fatalf("premier bloc %s, attendu le jeu le plus joué", blocks[0].GameSlug)
+	}
+}
+
+// TestIconeDuJeuSeulementQuandElleExiste verrouille la seule règle de
+// recapGameIcon : un jeu sans icône ne doit produire AUCUN lien.
+//
+// Émettre le lien dans tous les cas serait plus simple et faux : le cache
+// d'images répond 404 pour un jeu sans image source, et la page dessinerait
+// une image cassée à côté d'un nom parfaitement valide.
+func TestIconeDuJeuSeulementQuandElleExiste(t *testing.T) {
+	const base = "https://exemple.test"
+	icone := "https://cdn.exemple/app-icons/rl.png"
+
+	avec := game("g-rl", "rocket-league", "Rocket League")
+	avec.GameIcon = &icone
+	out := fiber.Map{}
+	recapGameIcon(out, base, avec)
+	if got := out["icon_url"]; got != base+"/img/games/g-rl/icon" {
+		t.Fatalf("icon_url = %v", got)
+	}
+
+	sans := game("g-x", "un-jeu", "Un jeu")
+	out = fiber.Map{}
+	recapGameIcon(out, base, sans)
+	if _, present := out["icon_url"]; present {
+		t.Fatalf("un jeu sans icône ne doit pas porter icon_url : %v", out["icon_url"])
 	}
 }

@@ -25,6 +25,7 @@
 	import { RL_SLUG, rlModeLabel, rlSideScore } from '$lib/rocketleague';
 	import Avatar from '$lib/components/Avatar.svelte';
 	import HsResult from '$lib/components/HsResult.svelte';
+	import GameIcon from '$lib/components/GameIcon.svelte';
 	import { t } from '$lib/i18n';
 
 	type Range = { from: string; to: string };
@@ -415,7 +416,8 @@
 			{@const rl = rlMembers(block)}
 			{@const hs = hsMembers(block)}
 			<section class="mb-5">
-				<h3 class="font-display mb-2 flex items-baseline gap-2 text-lg font-bold">
+				<h3 class="font-display mb-2 flex items-center gap-2 text-lg font-bold">
+					<GameIcon url={block.icon_url} size={22} />
 					<span class="text-[var(--color-text)]">{block.game_name}</span>
 					<span class="text-xs text-[var(--color-muted)] tabular-nums">
 						{t('recap.totalMatches', { count: block.matches })}
@@ -558,7 +560,10 @@
 								</a>
 							</td>
 							<td class="px-3 py-2 text-sm whitespace-nowrap text-[var(--color-muted)]">
-								{entry.game_name}
+								<span class="flex items-center gap-2">
+									<GameIcon url={entry.icon_url} size={18} />
+									{entry.game_name}
+								</span>
 							</td>
 							<td class="px-3 py-2 text-sm">
 								{#if rl}

@@ -24,6 +24,11 @@ type RecapGame struct {
 	GameID   string
 	GameSlug string
 	GameName string
+	// GameIcon is the game's source icon URL, nil when the catalog has none.
+	// The API never hands this out as is: it decides from nil whether to emit
+	// a link to the image cache at all, so a game without an icon produces no
+	// broken image rather than a 404 the page would have to hide.
+	GameIcon *string
 }
 
 // RecapRocketLeagueMatch is one Rocket League match played inside a recap
@@ -86,7 +91,7 @@ type RecapViewer struct {
 func (s *Store) RocketLeagueMatchesBetween(ctx context.Context, from, to time.Time, v RecapViewer) ([]RecapRocketLeagueMatch, error) {
 	rows, err := s.pool.Query(ctx, `
 		SELECT m.user_id, u.username, u.avatar_url,
-		       m.game_id, g.slug, g.name,
+		       m.game_id, g.slug, g.name, g.icon_url,
 		       m.playlist, m.team_size, m.player_team,
 		       m.team_blue_score, m.team_orange_score, m.result,
 		       m.goals, m.assists, m.saves, m.shots, m.score, m.demos,
@@ -106,7 +111,7 @@ func (s *Store) RocketLeagueMatchesBetween(ctx context.Context, from, to time.Ti
 	for rows.Next() {
 		var m RecapRocketLeagueMatch
 		if err := rows.Scan(&m.UserID, &m.Username, &m.AvatarURL,
-			&m.GameID, &m.GameSlug, &m.GameName,
+			&m.GameID, &m.GameSlug, &m.GameName, &m.GameIcon,
 			&m.Playlist, &m.TeamSize, &m.PlayerTeam,
 			&m.TeamBlueScore, &m.TeamOrangeScore, &m.Result,
 			&m.Goals, &m.Assists, &m.Saves, &m.Shots, &m.Score, &m.Demos,
@@ -124,7 +129,7 @@ func (s *Store) RocketLeagueMatchesBetween(ctx context.Context, from, to time.Ti
 func (s *Store) HearthstoneMatchesBetween(ctx context.Context, from, to time.Time, v RecapViewer) ([]RecapHearthstoneMatch, error) {
 	rows, err := s.pool.Query(ctx, `
 		SELECT m.user_id, u.username, u.avatar_url,
-		       m.game_id, g.slug, g.name,
+		       m.game_id, g.slug, g.name, g.icon_url,
 		       m.mode, m.result, m.turns, m.placement, m.hero_card_id, m.played_at
 		FROM hearthstone_matches m
 		JOIN users u ON u.id = m.user_id AND u.banned_at IS NULL
@@ -141,7 +146,7 @@ func (s *Store) HearthstoneMatchesBetween(ctx context.Context, from, to time.Tim
 	for rows.Next() {
 		var m RecapHearthstoneMatch
 		if err := rows.Scan(&m.UserID, &m.Username, &m.AvatarURL,
-			&m.GameID, &m.GameSlug, &m.GameName,
+			&m.GameID, &m.GameSlug, &m.GameName, &m.GameIcon,
 			&m.Mode, &m.Result, &m.Turns, &m.Placement, &m.HeroCardID,
 			&m.PlayedAt); err != nil {
 			return nil, err
