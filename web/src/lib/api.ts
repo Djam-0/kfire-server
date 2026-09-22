@@ -808,6 +808,41 @@ export const api = {
 		if (!res.ok) throw new Error('failed to set region');
 	},
 
+	/** Links a PUBG account from a typed in-game name and a platform. */
+	async linkPubg(name: string, platform: string): Promise<{ name: string; platform: string }> {
+		const res = await authFetch('/api/v1/connect/pubg', {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({ name, platform })
+		});
+		return json(res);
+	},
+
+	async unlinkPubg(): Promise<void> {
+		const res = await authFetch('/api/v1/connect/pubg', { method: 'DELETE' });
+		if (!res.ok && res.status !== 404) throw new Error('failed to unlink');
+	},
+
+	/** Returns the member's PUBG shard, or null when not linked. */
+	async getPubgPlatform(): Promise<{ platform: string } | null> {
+		const res = await authFetch('/api/v1/connect/pubg/platform');
+		if (res.status === 404) return null;
+		return json(res);
+	},
+
+	/**
+	 * Corrects the member's PUBG shard. The server resolves their name again on
+	 * the new shard, so this can fail the same way linking can.
+	 */
+	async setPubgPlatform(platform: string): Promise<{ name: string; platform: string }> {
+		const res = await authFetch('/api/v1/connect/pubg/platform', {
+			method: 'PATCH',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({ platform })
+		});
+		return json(res);
+	},
+
 	// --- admin ---------------------------------------------------------------
 
 	async getMembers(): Promise<Member[]> {
@@ -936,7 +971,7 @@ export async function getConfig(): Promise<{
 	needs_setup: boolean;
 	accent: string;
 	has_logo: boolean;
-	connectors: { steam: boolean; battlenet: boolean; xbox: boolean; riot: boolean };
+	connectors: { steam: boolean; battlenet: boolean; xbox: boolean; riot: boolean; pubg: boolean };
 }> {
 	const res = await fetch('/api/v1/config');
 	return res.ok
@@ -949,7 +984,7 @@ export async function getConfig(): Promise<{
 				has_logo: false,
 				// Fail open: if config can't be loaded, still offer the connectors
 				// rather than hiding working ones on a transient error.
-				connectors: { steam: true, battlenet: true, xbox: true, riot: true }
+				connectors: { steam: true, battlenet: true, xbox: true, riot: true, pubg: true }
 			};
 }
 

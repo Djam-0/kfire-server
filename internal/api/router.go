@@ -19,6 +19,7 @@ import (
 	"github.com/knightsofeternity/kfire-server/internal/bnetsync"
 	"github.com/knightsofeternity/kfire-server/internal/config"
 	"github.com/knightsofeternity/kfire-server/internal/connectors/battlenet"
+	"github.com/knightsofeternity/kfire-server/internal/connectors/pubg"
 	"github.com/knightsofeternity/kfire-server/internal/connectors/riot"
 	"github.com/knightsofeternity/kfire-server/internal/connectors/steam"
 	"github.com/knightsofeternity/kfire-server/internal/connectors/xbox"
@@ -44,6 +45,7 @@ type handlers struct {
 	xbox      *xbox.Connector
 	riot      *riot.Connector
 	riotSync  *riotsync.Syncer
+	pubg      *pubg.Connector
 	cipher    *crypto.Cipher
 	plugins   *gameplugin.Registry
 }
@@ -102,7 +104,8 @@ func Register(app *fiber.App, cfg *config.Config, st *store.Store, hub *ws.Hub, 
 	if cfg.XblAPIBase != "" {
 		xblConn.APIBase = cfg.XblAPIBase
 	}
-	h := &handlers{cfg: cfg, store: st, hub: hub, steam: steamConn, steamSync: syncer, battlenet: bnConn, bnetSync: bnetSync, xbox: xblConn, riot: riotConn, riotSync: riotSync, cipher: cipher, plugins: plugins}
+	pubgConn := pubg.New(cfg.PubgAPIKey)
+	h := &handlers{cfg: cfg, store: st, hub: hub, steam: steamConn, steamSync: syncer, battlenet: bnConn, bnetSync: bnetSync, xbox: xblConn, riot: riotConn, riotSync: riotSync, pubg: pubgConn, cipher: cipher, plugins: plugins}
 
 	app.Get("/healthz", func(c *fiber.Ctx) error {
 		return c.JSON(fiber.Map{"status": "ok"})
@@ -171,6 +174,10 @@ func Register(app *fiber.App, cfg *config.Config, st *store.Store, hub *ws.Hub, 
 	v1.Get("/connect/riot/region", h.requireAuth, h.riotRegion)
 	v1.Patch("/connect/riot/region", h.requireAuth, h.updateRiotRegion)
 	v1.Delete("/connect/riot", h.requireAuth, h.disconnectRiot)
+	v1.Post("/connect/pubg", rateLimiter(10), h.requireAuth, h.connectPubg)
+	v1.Get("/connect/pubg/platform", h.requireAuth, h.pubgPlatform)
+	v1.Patch("/connect/pubg/platform", rateLimiter(10), h.requireAuth, h.updatePubgPlatform)
+	v1.Delete("/connect/pubg", h.requireAuth, h.disconnectPubg)
 
 	admin := v1.Group("/admin", h.requireAuth, h.requireAdmin)
 	admin.Get("/games/catalog", h.gamesCatalogStatus)

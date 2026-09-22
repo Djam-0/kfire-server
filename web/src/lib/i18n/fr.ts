@@ -414,6 +414,28 @@ export const fr: Catalog = {
 			unlink: 'Délier',
 			trust: "KFIRE ne vérifie pas que ce compte vous appartient, il vérifie seulement que le Riot ID existe et n'est pas déjà lié à un autre membre."
 		},
+		pubg: {
+			title: 'PUBG',
+			blurb:
+				'Liez votre compte PUBG pour conserver vos parties. L’éditeur les efface au bout de 14 jours : ce qui n’est pas collecté avant est perdu pour tout le monde.',
+			nameLabel: 'Pseudo en jeu',
+			namePlaceholder: 'VotrePseudoPUBG',
+			platform: 'Plateforme',
+			submit: 'Lier le compte',
+			unlink: 'Délier',
+			keepsHistory:
+				'Délier arrête la collecte et conserve les parties déjà enregistrées : l’éditeur les efface après 14 jours, les supprimer ici serait définitif.',
+			errors: {
+				invalidName: 'Saisissez votre pseudo PUBG, tel qu’il apparaît en jeu.',
+				invalidPlatform: 'Choisissez une plateforme prise en charge.',
+				notFound:
+					'PUBG ne connaît pas ce pseudo sur cette plateforme. Vérifiez l’orthographe et la plateforme choisie.',
+				unavailable: 'PUBG n’a pas répondu. Réessayez dans un instant.',
+				alreadyLinked: 'Ce compte PUBG est déjà lié à un autre membre.',
+				disabled: "Le connecteur PUBG n'est pas configuré sur cette instance.",
+				rateLimited: 'Trop de tentatives. Attendez une minute et réessayez.'
+			}
+		},
 		bnetReconnectStats: 'Reconnecte Battle.net pour activer tes stats de jeu'
 	},
 	admin: {

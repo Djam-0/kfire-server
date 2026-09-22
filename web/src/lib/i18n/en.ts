@@ -412,6 +412,28 @@ export const en = {
 			unlink: 'Unlink',
 			trust: 'KFIRE does not verify that you own this account, it only checks that the Riot ID exists and is not already linked to another member.'
 		},
+		pubg: {
+			title: 'PUBG',
+			blurb:
+				'Link your PUBG account to keep your matches. The publisher deletes them after 14 days: whatever is not collected before that is lost for everyone.',
+			nameLabel: 'In-game name',
+			namePlaceholder: 'YourPubgName',
+			platform: 'Platform',
+			submit: 'Link account',
+			unlink: 'Unlink',
+			keepsHistory:
+				'Unlinking stops the collection and keeps the matches already recorded: the publisher deletes them after 14 days, so removing them here would be permanent.',
+			errors: {
+				invalidName: 'Enter your PUBG name, exactly as it appears in game.',
+				invalidPlatform: 'Pick one of the supported platforms.',
+				notFound:
+					'PUBG does not know this name on this platform. Check the spelling and the platform you picked.',
+				unavailable: 'PUBG did not answer. Try again in a moment.',
+				alreadyLinked: 'This PUBG account is already linked to another member.',
+				disabled: 'The PUBG connector is not configured on this instance.',
+				rateLimited: 'Too many attempts. Wait a minute and try again.'
+			}
+		},
 		bnetReconnectStats: 'Reconnect Battle.net to enable your game stats'
 	},
 	admin: {
