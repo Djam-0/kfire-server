@@ -23,6 +23,7 @@ import (
 	"github.com/knightsofeternity/kfire-server/internal/hearthstone"
 	"github.com/knightsofeternity/kfire-server/internal/livestate"
 	"github.com/knightsofeternity/kfire-server/internal/matchrecord"
+	"github.com/knightsofeternity/kfire-server/internal/pubgsync"
 	"github.com/knightsofeternity/kfire-server/internal/riotsync"
 	"github.com/knightsofeternity/kfire-server/internal/rocketleague"
 	"github.com/knightsofeternity/kfire-server/internal/steamsync"
@@ -138,13 +139,19 @@ func main() {
 		go xs.Run(pollCtx, cfg.XboxPollInterval)
 	}
 
-	riotSync := api.Register(app, cfg, st, hub, steamConn, syncer, cipher)
+	riotSync, pubgConn := api.Register(app, cfg, st, hub, steamConn, syncer, cipher)
 
 	// League live-game loop. It reads open League sessions first, so it costs
 	// nothing while nobody is playing.
 	if cfg.RiotLolKey != "" {
 		go riotSync.RunLive(pollCtx, cfg.RiotLivePollInterval)
 		go riotSync.RunBackfill(pollCtx)
+	}
+
+	// PUBG history collection. The publisher deletes a match 14 days after it
+	// was played, so a day without a pass is a day nothing can ever recover.
+	if cfg.PubgAPIKey != "" {
+		go pubgsync.New(st, pubgConn).Run(pollCtx)
 	}
 
 	// Serve the embedded admin SPA (when built). Mounted last so API and

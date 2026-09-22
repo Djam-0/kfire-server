@@ -279,6 +279,54 @@ export type RlMatch = {
 };
 
 /**
+ * A member's PUBG record for one game, aggregated by the database over the
+ * whole stored history.
+ *
+ * There is no teammate anywhere in here, and there cannot be: a PUBG response
+ * names all hundred players of a match, and the table those numbers come from
+ * has no column able to hold a name.
+ */
+export type PubgPlayer = {
+	user_id: string;
+	username: string;
+	avatar_url?: string;
+	matches: number;
+	/** Matches finished first: a Chicken Dinner, as players call it. */
+	wins: number;
+	top_tens: number;
+	kills: number;
+	/** Total damage over every stored match, not a per-match average. */
+	damage_dealt: number;
+	/** Lowest finishing position reached, so 1 is the best possible. */
+	best_place: number;
+	time_survived: number; // seconds
+	last_played_at: string;
+};
+
+/**
+ * One stored PUBG match, from the member's own history, newest first.
+ *
+ * `map_name` and `game_mode` are PUBG's own identifiers (`Baltic_Main`,
+ * `squad-fpp`) and never a label: the server sends the fact and the browser
+ * names it, because the name differs per language.
+ */
+export type PubgMatch = {
+	match_id: string;
+	game_mode: string;
+	map_name: string;
+	/** 1 is a Chicken Dinner. */
+	win_place: number;
+	kills: number;
+	assists: number;
+	headshot_kills: number;
+	revives: number;
+	damage_dealt: number;
+	time_survived: number;
+	duration_secs: number;
+	played_at: string;
+};
+
+/**
  * The member a recap row CAME FROM, and nothing else.
  *
  * There is deliberately no second player anywhere in a recap: the match tables
@@ -406,6 +454,7 @@ export type GameDetail = {
 	hs_players?: HsPlayer[];
 	hs_heroes?: HsHero[];
 	rl_players?: RlPlayer[];
+	pubg_players?: PubgPlayer[];
 };
 
 export type PlayerGameAchievement = {
@@ -469,6 +518,8 @@ export type PlayerGameDetail = {
 	hs_profile?: HsProfile;
 	/** The member's last ten Rocket League matches, newest first. */
 	rl_matches?: RlMatch[];
+	/** The member's last ten stored PUBG matches, newest first. */
+	pubg_matches?: PubgMatch[];
 	achievements?: PlayerGameAchievement[];
 };
 
@@ -808,6 +859,41 @@ export const api = {
 		if (!res.ok) throw new Error('failed to set region');
 	},
 
+	/** Links a PUBG account from a typed in-game name and a platform. */
+	async linkPubg(name: string, platform: string): Promise<{ name: string; platform: string }> {
+		const res = await authFetch('/api/v1/connect/pubg', {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({ name, platform })
+		});
+		return json(res);
+	},
+
+	async unlinkPubg(): Promise<void> {
+		const res = await authFetch('/api/v1/connect/pubg', { method: 'DELETE' });
+		if (!res.ok && res.status !== 404) throw new Error('failed to unlink');
+	},
+
+	/** Returns the member's PUBG shard, or null when not linked. */
+	async getPubgPlatform(): Promise<{ platform: string } | null> {
+		const res = await authFetch('/api/v1/connect/pubg/platform');
+		if (res.status === 404) return null;
+		return json(res);
+	},
+
+	/**
+	 * Corrects the member's PUBG shard. The server resolves their name again on
+	 * the new shard, so this can fail the same way linking can.
+	 */
+	async setPubgPlatform(platform: string): Promise<{ name: string; platform: string }> {
+		const res = await authFetch('/api/v1/connect/pubg/platform', {
+			method: 'PATCH',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({ platform })
+		});
+		return json(res);
+	},
+
 	// --- admin ---------------------------------------------------------------
 
 	async getMembers(): Promise<Member[]> {
@@ -936,7 +1022,7 @@ export async function getConfig(): Promise<{
 	needs_setup: boolean;
 	accent: string;
 	has_logo: boolean;
-	connectors: { steam: boolean; battlenet: boolean; xbox: boolean; riot: boolean };
+	connectors: { steam: boolean; battlenet: boolean; xbox: boolean; riot: boolean; pubg: boolean };
 }> {
 	const res = await fetch('/api/v1/config');
 	return res.ok
@@ -949,7 +1035,7 @@ export async function getConfig(): Promise<{
 				has_logo: false,
 				// Fail open: if config can't be loaded, still offer the connectors
 				// rather than hiding working ones on a transient error.
-				connectors: { steam: true, battlenet: true, xbox: true, riot: true }
+				connectors: { steam: true, battlenet: true, xbox: true, riot: true, pubg: true }
 			};
 }
 

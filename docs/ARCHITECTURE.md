@@ -169,6 +169,32 @@ starting over; and a transient failure abandons the page WITHOUT moving the curs
 last point is not a detail -- skipping a match on a rate limit would move the cursor past
 history that nothing would ever walk again, carving a permanent hole nobody could audit.
 
+## The PUBG quota, and why it is not the Riot one
+
+PUBG allows **10 requests per minute**, tighter than Riot. But **`/matches` and telemetry do
+not count against it**, which was confirmed from the response headers rather than the docs:
+a `/players` response carries `x-ratelimit-remaining` and a `/matches` response carries no
+rate-limit header at all.
+
+That asymmetry shapes the code. A limiter applied to every call would make a sync a hundred
+times slower for nothing, so `internal/connectors/pubg` consults a named predicate and paces
+only the paths the publisher actually meters. Resolving a player costs; reading their matches
+does not.
+
+PUBG also does not send `Retry-After`. It sends `X-RateLimit-Reset`, an **absolute** UNIX
+timestamp, so the back-off is computed against the clock with a ceiling in case the clocks
+disagree.
+
+**The publisher deletes matches after 14 days**, itself included. `pubg_matches` is therefore
+the only place that history survives, which is the reason the table exists: anything not
+collected within the fortnight is gone for everyone, forever. That is also why a failure that
+can never succeed, such as a CHECK violation, is told apart from a passing one: retrying it
+daily would burn the fortnight and lose the match anyway.
+
+Finally, what counts as a match is an **accept list**, not a reject list. A survey of forty
+real matches turned up a type absent from an earlier survey of six, so an unknown type is
+dropped by default rather than stored by accident.
+
 ## Key data
 
 `orgs`, `users`, `refresh_tokens` (device-bound), `device_pairings`, `invites`, `games`,

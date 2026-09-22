@@ -274,7 +274,26 @@ export const fr: Catalog = {
 		rlBlue: 'Bleu',
 		rlOrange: 'Orange',
 		rlRecentMatches: 'Dernières parties',
-		rlRecordTile: 'Bilan'
+		rlRecordTile: 'Bilan',
+		pubgRecord: 'Bilan PUBG',
+		pubgPlayers: 'Membres suivis',
+		pubgMatches: 'Parties',
+		// Une victoire à PUBG s'appelle un Chicken Dinner et personne ne dit
+		// autrement à table, donc le libellé ne traduit pas.
+		pubgWins: 'Chicken Dinners',
+		pubgChickenDinner: 'Chicken Dinner',
+		pubgTopTenRate: 'Taux de top 10',
+		pubgKills: 'Éliminations',
+		pubgAvgDamage: 'Dégâts moyens',
+		pubgBestPlace: 'Meilleur classement',
+		pubgLastPlayed: 'Dernière partie',
+		pubgRankingNote:
+			"Classé par Chicken Dinners. L'éditeur efface les parties au bout de 14 jours, KFIRE garde donc l'historique que son API ne sait plus rendre.",
+		pubgRecentMatches: 'Dernières parties',
+		pubgDamage: 'Dégâts',
+		pubgSurvived: 'Survie',
+		pubgNoMatches:
+			"Aucune partie enregistrée pour l'instant. La collecte passe une fois par jour, et seules les parties des 14 derniers jours peuvent encore être récupérées."
 	},
 	playerGame: {
 		loading: 'Chargement...',
@@ -413,6 +432,28 @@ export const fr: Catalog = {
 			submit: 'Lier le compte',
 			unlink: 'Délier',
 			trust: "KFIRE ne vérifie pas que ce compte vous appartient, il vérifie seulement que le Riot ID existe et n'est pas déjà lié à un autre membre."
+		},
+		pubg: {
+			title: 'PUBG',
+			blurb:
+				'Liez votre compte PUBG pour conserver vos parties. L’éditeur les efface au bout de 14 jours : ce qui n’est pas collecté avant est perdu pour tout le monde.',
+			nameLabel: 'Pseudo en jeu',
+			namePlaceholder: 'VotrePseudoPUBG',
+			platform: 'Plateforme',
+			submit: 'Lier le compte',
+			unlink: 'Délier',
+			keepsHistory:
+				'Délier arrête la collecte et conserve les parties déjà enregistrées : l’éditeur les efface après 14 jours, les supprimer ici serait définitif.',
+			errors: {
+				invalidName: 'Saisissez votre pseudo PUBG, tel qu’il apparaît en jeu.',
+				invalidPlatform: 'Choisissez une plateforme prise en charge.',
+				notFound:
+					'PUBG ne connaît pas ce pseudo sur cette plateforme. Vérifiez l’orthographe et la plateforme choisie.',
+				unavailable: 'PUBG n’a pas répondu. Réessayez dans un instant.',
+				alreadyLinked: 'Ce compte PUBG est déjà lié à un autre membre.',
+				disabled: "Le connecteur PUBG n'est pas configuré sur cette instance.",
+				rateLimited: 'Trop de tentatives. Attendez une minute et réessayez.'
+			}
 		},
 		bnetReconnectStats: 'Reconnecte Battle.net pour activer tes stats de jeu'
 	},

@@ -19,12 +19,14 @@ import (
 	"github.com/knightsofeternity/kfire-server/internal/bnetsync"
 	"github.com/knightsofeternity/kfire-server/internal/config"
 	"github.com/knightsofeternity/kfire-server/internal/connectors/battlenet"
+	"github.com/knightsofeternity/kfire-server/internal/connectors/pubg"
 	"github.com/knightsofeternity/kfire-server/internal/connectors/riot"
 	"github.com/knightsofeternity/kfire-server/internal/connectors/steam"
 	"github.com/knightsofeternity/kfire-server/internal/connectors/xbox"
 	"github.com/knightsofeternity/kfire-server/internal/crypto"
 	"github.com/knightsofeternity/kfire-server/internal/gameplugin"
 	"github.com/knightsofeternity/kfire-server/internal/hearthstone"
+	"github.com/knightsofeternity/kfire-server/internal/pubgsync"
 	"github.com/knightsofeternity/kfire-server/internal/riotsync"
 	"github.com/knightsofeternity/kfire-server/internal/rocketleague"
 	"github.com/knightsofeternity/kfire-server/internal/steamsync"
@@ -44,6 +46,7 @@ type handlers struct {
 	xbox      *xbox.Connector
 	riot      *riot.Connector
 	riotSync  *riotsync.Syncer
+	pubg      *pubg.Connector
 	cipher    *crypto.Cipher
 	plugins   *gameplugin.Registry
 }
@@ -66,7 +69,11 @@ func rateLimiter(max int) fiber.Handler {
 }
 
 // Register mounts every route on the Fiber app.
-func Register(app *fiber.App, cfg *config.Config, st *store.Store, hub *ws.Hub, steamConn *steam.Connector, syncer *steamsync.Syncer, cipher *crypto.Cipher) *riotsync.Syncer {
+// It returns the League syncer and the PUBG connector, both of which drive
+// background loops the caller starts. The PUBG connector is handed back rather
+// than rebuilt there because the quota belongs to the key: a second instance
+// would carry a second limiter and quietly allow twice the agreed rate.
+func Register(app *fiber.App, cfg *config.Config, st *store.Store, hub *ws.Hub, steamConn *steam.Connector, syncer *steamsync.Syncer, cipher *crypto.Cipher) (*riotsync.Syncer, *pubg.Connector) {
 	bnConn := battlenet.New(cfg.BattlenetClientID, cfg.BattlenetClientSecret)
 	if cfg.BattlenetOAuthBase != "" {
 		bnConn.OAuthBase = cfg.BattlenetOAuthBase
@@ -86,6 +93,10 @@ func Register(app *fiber.App, cfg *config.Config, st *store.Store, hub *ws.Hub, 
 	plugins.Register(lolPlugin)
 	plugins.Register(hearthstone.New(st))
 	plugins.Register(rocketleague.New(st))
+	// Built here and not below with the other connectors: the quota belongs to
+	// the key, and a second instance would carry a second limiter.
+	pubgConn := pubg.New(cfg.PubgAPIKey)
+	plugins.Register(pubgsync.NewPlugin(st, pubgConn))
 	if err := plugins.Load(context.Background()); err != nil {
 		slog.Error("game plugins load", "err", err)
 	}
@@ -102,7 +113,7 @@ func Register(app *fiber.App, cfg *config.Config, st *store.Store, hub *ws.Hub, 
 	if cfg.XblAPIBase != "" {
 		xblConn.APIBase = cfg.XblAPIBase
 	}
-	h := &handlers{cfg: cfg, store: st, hub: hub, steam: steamConn, steamSync: syncer, battlenet: bnConn, bnetSync: bnetSync, xbox: xblConn, riot: riotConn, riotSync: riotSync, cipher: cipher, plugins: plugins}
+	h := &handlers{cfg: cfg, store: st, hub: hub, steam: steamConn, steamSync: syncer, battlenet: bnConn, bnetSync: bnetSync, xbox: xblConn, riot: riotConn, riotSync: riotSync, pubg: pubgConn, cipher: cipher, plugins: plugins}
 
 	app.Get("/healthz", func(c *fiber.Ctx) error {
 		return c.JSON(fiber.Map{"status": "ok"})
@@ -171,6 +182,10 @@ func Register(app *fiber.App, cfg *config.Config, st *store.Store, hub *ws.Hub, 
 	v1.Get("/connect/riot/region", h.requireAuth, h.riotRegion)
 	v1.Patch("/connect/riot/region", h.requireAuth, h.updateRiotRegion)
 	v1.Delete("/connect/riot", h.requireAuth, h.disconnectRiot)
+	v1.Post("/connect/pubg", rateLimiter(10), h.requireAuth, h.connectPubg)
+	v1.Get("/connect/pubg/platform", h.requireAuth, h.pubgPlatform)
+	v1.Patch("/connect/pubg/platform", rateLimiter(10), h.requireAuth, h.updatePubgPlatform)
+	v1.Delete("/connect/pubg", h.requireAuth, h.disconnectPubg)
 
 	admin := v1.Group("/admin", h.requireAuth, h.requireAdmin)
 	admin.Get("/games/catalog", h.gamesCatalogStatus)
@@ -220,7 +235,7 @@ func Register(app *fiber.App, cfg *config.Config, st *store.Store, hub *ws.Hub, 
 	// Org logo (public: shown in the header and on the login screen).
 	app.Get("/img/org/logo", h.orgLogo)
 
-	return riotSync
+	return riotSync, pubgConn
 }
 
 func notImplemented(c *fiber.Ctx) error {
