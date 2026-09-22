@@ -99,9 +99,14 @@
 	<ul class="grid gap-3 sm:grid-cols-2">
 		{#each filtered as g (g.id)}
 			<li>
+				<!-- On a phone the duration drops onto its own line rather than
+				     squeezing the name into two letters or cutting a title nobody
+				     can then recognise. From `sm` up there is room for one line,
+				     and the durations line up again in a column that can be read
+				     down. -->
 				<a
 					href={`/games/${g.slug}`}
-					class="pd-card group flex items-center gap-3 p-3 transition-colors hover:border-[var(--color-brand)]"
+					class="pd-card group flex flex-wrap items-center gap-x-3 gap-y-1 p-3 transition-colors hover:border-[var(--color-brand)] sm:flex-nowrap"
 				>
 					{#if g.icon_url}
 						<img src={g.icon_url} alt="" class="pd-cut-sm h-12 w-12 shrink-0 object-cover" />
@@ -113,7 +118,7 @@
 					{/if}
 					<div class="min-w-0 flex-1">
 						<p
-							class="font-display truncate font-bold text-[var(--color-text)] group-hover:text-[var(--color-brand-bright)]"
+							class="font-display font-bold break-words text-[var(--color-text)] group-hover:text-[var(--color-brand-bright)] sm:truncate sm:break-normal"
 						>
 							{g.name}
 						</p>
@@ -123,7 +128,9 @@
 								: t('gamesList.players', { count: g.player_count })}
 						</p>
 					</div>
-					<span class="font-display text-sm font-bold text-[var(--color-brand-bright)]">
+					<span
+						class="font-display w-full shrink-0 pl-15 text-sm font-bold whitespace-nowrap text-[var(--color-brand-bright)] sm:w-auto sm:pl-0"
+					>
 						{formatDuration(g.total_seconds)}
 					</span>
 				</a>

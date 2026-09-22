@@ -20,6 +20,14 @@
 	let achOffset = $state(0);
 	let achHasMore = $state(false);
 	let achLoading = $state(false);
+
+	// Steam serves 404 for a fair share of achievement icons it nonetheless
+	// names in its own API (measured on this very profile: 2 of 40 sampled).
+	// The URL existing is therefore not a promise that the image does, and
+	// without this the browser draws its broken-image glyph next to a perfectly
+	// good achievement. Keyed by the same identity as the loop, so one dead
+	// icon never hides another trophy.
+	let brokenIcons = $state(new Set<string>());
 	const ACH_LIMIT = 24;
 
 	let libraryOpen = $state(false);
@@ -230,8 +238,11 @@
 						{#if stat.game.icon_url}
 							<img src={stat.game.icon_url} alt="" class="h-6 w-6 shrink-0 rounded" />
 						{/if}
-						<span class="w-40 shrink-0 truncate text-sm">{stat.game.name}</span>
-						<div class="h-2 flex-1 overflow-hidden bg-[var(--color-bg)]" style="clip-path: polygon(4px 0, 100% 0, calc(100% - 4px) 100%, 0 100%)">
+						<span class="min-w-0 flex-1 truncate text-sm sm:w-40 sm:flex-none">{stat.game.name}</span>
+						<!-- The bar is the one thing here that can go: on a phone it
+						     would be crushed to a few pixels and say nothing, while the
+						     name and the figure both still have to be readable. -->
+						<div class="hidden h-2 flex-1 overflow-hidden bg-[var(--color-bg)] sm:block" style="clip-path: polygon(4px 0, 100% 0, calc(100% - 4px) 100%, 0 100%)">
 							<div
 								class="h-full bg-[var(--color-brand)]"
 								style="width:{Math.max(2, (stat.total_seconds / topSeconds) * 100)}%; clip-path: polygon(4px 0, 100% 0, calc(100% - 4px) 100%, 0 100%)"
@@ -321,9 +332,15 @@
 		{:else}
 			<div class="pd-card grid gap-3 p-4 sm:grid-cols-2">
 				{#each achievements as a (a.game.id + a.api_name)}
+					{@const key = a.game.id + a.api_name}
 					<div class="flex items-center gap-3 rounded bg-[var(--color-surface-2)] px-3 py-2">
-						{#if a.icon_url}
-							<img src={a.icon_url} alt="" class="h-9 w-9 shrink-0 pd-cut-sm object-cover" />
+						{#if a.icon_url && !brokenIcons.has(key)}
+							<img
+								src={a.icon_url}
+								alt=""
+								class="h-9 w-9 shrink-0 pd-cut-sm object-cover"
+								onerror={() => (brokenIcons = new Set(brokenIcons).add(key))}
+							/>
 						{:else}
 							<span class="grid h-9 w-9 shrink-0 pd-cut-sm place-items-center bg-[var(--color-bg)] font-display text-base text-[var(--color-gold)]">🏆</span>
 						{/if}
