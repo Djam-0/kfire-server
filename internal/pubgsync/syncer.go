@@ -12,6 +12,8 @@ import (
 	"context"
 	"errors"
 	"log/slog"
+
+	"github.com/jackc/pgx/v5/pgconn"
 	"time"
 
 	"github.com/knightsofeternity/kfire-server/internal/connectors/pubg"
@@ -188,8 +190,21 @@ func walk(ctx context.Context, p puller, m store.PubgPlayer, matchIDs []string,
 			continue
 		}
 		if err := save(r); err != nil {
-			// A database failure is passing by nature, and the insert is
-			// idempotent, so the next pass writes it.
+			// A CHECK violation is the one database failure that will NEVER
+			// succeed: the match really is outside the bounds this table
+			// declares. Treating it as passing would retry it every day for the
+			// fourteen days the publisher keeps it, log an error each time, and
+			// lose it anyway. Counting it as permanent stops the storm, and the
+			// single loud line is what tells us a bound is wrong so we can widen
+			// it while the match is still fetchable.
+			if isCheckViolation(err) {
+				res.permanent++
+				slog.Error("pubgsync: a match falls outside what the table allows, and a bound is probably too tight",
+					"user_id", m.UserID, "match_id", id, "err", err)
+				continue
+			}
+			// Anything else is passing by nature, and the insert is idempotent,
+			// so the next pass writes it.
 			res.retryable++
 			slog.Error("pubgsync: store match", "user_id", m.UserID, "match_id", id, "err", err)
 			continue
@@ -213,4 +228,14 @@ func toStore(userID, gameID string, r pubg.MatchResult) store.PubgMatch {
 		DamageDealt: r.DamageDealt, TimeSurvived: r.TimeSurvived,
 		DurationSecs: r.DurationSecs, PlayedAt: r.PlayedAt,
 	}
+}
+
+// isCheckViolation reports whether an error is PostgreSQL refusing a row
+// because it breaks a CHECK constraint.
+//
+// SQLSTATE 23514 is the only database failure here that retrying cannot fix,
+// which is why it is worth telling apart from a connection that dropped.
+func isCheckViolation(err error) bool {
+	var pgErr *pgconn.PgError
+	return errors.As(err, &pgErr) && pgErr.Code == "23514"
 }

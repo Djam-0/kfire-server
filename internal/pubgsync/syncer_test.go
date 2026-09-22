@@ -3,6 +3,8 @@ package pubgsync
 import (
 	"context"
 	"errors"
+	"fmt"
+	"github.com/jackc/pgx/v5/pgconn"
 	"net/http"
 	"testing"
 
@@ -141,5 +143,26 @@ func TestUnContexteAnnuleArreteLeLot(t *testing.T) {
 
 	if len(p.read) != 0 || res.stored != 0 {
 		t.Fatalf("aucun appel n'était attendu après l'annulation : %v %+v", p.read, res)
+	}
+}
+
+// Une violation de contrainte ne guérit jamais. La confondre avec une panne
+// passagère ferait retenter le match chaque jour pendant les quatorze jours où
+// l'éditeur le garde, avec une erreur par jour, pour le perdre quand même.
+func TestUneViolationDeContrainteEstDefinitive(t *testing.T) {
+	violation := &pgconn.PgError{Code: "23514", Message: "check constraint"}
+	if !isCheckViolation(violation) {
+		t.Fatal("une 23514 doit être reconnue comme définitive")
+	}
+	// Enveloppée, comme elle arrive vraiment depuis le store.
+	if !isCheckViolation(fmt.Errorf("insert: %w", violation)) {
+		t.Fatal("elle doit être reconnue à travers un enrobage")
+	}
+	// Une panne de connexion, elle, se retente.
+	if isCheckViolation(&pgconn.PgError{Code: "08006"}) {
+		t.Fatal("une panne de connexion n'est pas définitive")
+	}
+	if isCheckViolation(errors.New("contexte annulé")) {
+		t.Fatal("une erreur quelconque n'est pas une violation de contrainte")
 	}
 }
