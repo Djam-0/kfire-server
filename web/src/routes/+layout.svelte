@@ -57,7 +57,19 @@
 
 	async function loadSnapshot(userId: string) {
 		try {
-			presence.hydrate(await api.getPresence());
+			const snapshot = await api.getPresence();
+			presence.hydrate(snapshot);
+			// The same snapshot carries the matches in progress, so a page
+			// reloaded mid-match draws its cards straight away instead of
+			// waiting for the next sample. That wait was imperceptible on
+			// Rocket League and lasted a whole turn on Hearthstone.
+			liveMatches.hydrate(
+				snapshot.flatMap((e) =>
+					e.live?.match && e.live.game_slug
+						? [{ user_id: e.user_id, game_slug: e.live.game_slug, match: e.live.match }]
+						: []
+				)
+			);
 		} catch {
 			// The socket refills the store from the next updates.
 			presence.hydrate([]);

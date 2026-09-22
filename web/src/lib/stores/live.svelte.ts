@@ -2,10 +2,14 @@
 // WebSocket (see `$lib/ws`). One source of truth for every consumer: the
 // players page, the nav indicator, and any page that needs it later.
 //
-// No persistence, on purpose: this state is broadcast twice a second and
-// never stored anywhere. A reloaded page starts empty and refills from the
-// next sample within about half a second. Do not add localStorage or a REST
-// "catch up" fetch here.
+// No persistence, on purpose: this state is never stored anywhere. Do not add
+// localStorage, and do not add a REST "catch up" fetch of your own.
+//
+// A reloaded page is seeded from the presence snapshot it already requests
+// (see `hydrate`). That used to be unnecessary, back when the only live game
+// sampled twice a second and a reload refilled before anyone noticed.
+// Hearthstone broke it: it emits on turn changes, so a reload mid-turn left
+// the card missing for as long as the turn lasted.
 
 import type { LiveMatch, LiveMatchUpdate } from '../ws';
 
@@ -50,6 +54,18 @@ function clear(): void {
 	entries = new Map();
 }
 
+/** Seeds the store from what the presence snapshot carried, replacing
+ *  whatever it held.
+ *
+ *  Replacing rather than merging is the point: the snapshot is the server's
+ *  full truth at that instant, so a match it does not mention is a match that
+ *  has ended, and keeping it would freeze a dead score on the page. */
+function hydrate(snapshot: LiveEntry[]): void {
+	const next = new Map<string, LiveEntry>();
+	for (const e of snapshot) next.set(e.user_id, e);
+	entries = next;
+}
+
 export const liveMatches = {
 	/** The current live match for a member, if any. */
 	get(userId: string): LiveEntry | undefined {
@@ -69,5 +85,6 @@ export const liveMatches = {
 	},
 	apply,
 	remove,
-	clear
+	clear,
+	hydrate
 };

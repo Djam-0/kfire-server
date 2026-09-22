@@ -721,6 +721,28 @@ func (h *Hub) LiveMatch(userID string) map[string]any {
 	return e.match
 }
 
+// LiveSnapshot is the live state a freshly loaded page needs, or nil when the
+// member has none.
+//
+// The live store in the browser is deliberately not persisted, and that was
+// fine as long as the only live game sampled twice a second: a reloaded page
+// refilled before anyone noticed. Hearthstone broke that assumption. It emits
+// on turn changes, so a reload mid-turn left the card missing for as long as
+// the turn lasted, while the hub knew perfectly well what was being played.
+//
+// So the hub answers. This is NOT a catch-up fetch: it rides along on the
+// presence snapshot the page already requests, and nothing is stored in the
+// browser.
+func (h *Hub) LiveSnapshot(userID string) map[string]any {
+	h.mu.RLock()
+	e, ok := h.live[userID]
+	h.mu.RUnlock()
+	if !ok || e.expired(time.Now()) {
+		return nil
+	}
+	return map[string]any{"game_slug": e.slug, "match": e.match}
+}
+
 // liveJSON builds what is broadcast for one member: the state, plus the game it
 // belongs to so the browser can pick its rendering, or a nil match when the
 // game is over.
