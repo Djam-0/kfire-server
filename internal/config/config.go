@@ -56,6 +56,10 @@ type Config struct {
 	// personal key's rate limits, so accounts are linked by a typed Riot ID
 	// rather than through OAuth.
 	RiotLolKey string
+
+	// PubgAPIKey is the PUBG Game Data Service key. Empty disables the
+	// connector entirely, and the account page then hides its card.
+	PubgAPIKey string
 	// RiotAPIBase overrides the Riot API host (tests only).
 	RiotAPIBase string
 	// RiotLivePollInterval is how often the League live-game loop runs.
@@ -87,6 +91,7 @@ func Load() (*Config, error) {
 		XblAPIBase:            os.Getenv("KFIRE_XBL_API_BASE"),
 
 		RiotLolKey:  os.Getenv("KFIRE_RIOT_LOL_KEY"),
+		PubgAPIKey:  os.Getenv("KFIRE_PUBG_API_KEY"),
 		RiotAPIBase: os.Getenv("KFIRE_RIOT_API_BASE"),
 	}
 
